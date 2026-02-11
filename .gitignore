@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment / secrets
+.env
+*.env.local
+
+# Scraped output data
+output/
+
+# Claude Code local settings
+.claude/
+
+# Serena cache
+.serena/cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock files are included for reproducibility

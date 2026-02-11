@@ -1,0 +1,36 @@
+{
+  "name": "prodactive-scrapekit",
+  "version": "1.0.0",
+  "description": "A ZenRows-inspired web scraping toolkit with CSS extraction, auto-parsing, and multiple output formats",
+  "main": "lib/index.js",
+  "bin": {
+    "scrapekit": "./scrapekit.js",
+    "scrapekit-tui": "./tui/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "scraper",
+    "web-scraping",
+    "css-extractor",
+    "auto-parser"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "axios-retry": "^4.5.0",
+    "cheerio": "^1.1.2",
+    "commander": "^14.0.3",
+    "html-to-text": "^9.0.5",
+    "json2csv": "^6.0.0-alpha.2",
+    "p-limit": "^3.1.0",
+    "puppeteer": "^24.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "turndown": "^7.2.2",
+    "user-agents": "^1.1.669"
+  }
+}

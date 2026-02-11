@@ -1,0 +1,923 @@
+{
+  "search_summary": {
+    "platforms_searched": ["ZenRows Official Docs", "GitHub", "ScrapeOps", "Medium", "G2", "Capterra", "npm", "PyPI"],
+    "documentation_reviewed": 50,
+    "features_cataloged": 150,
+    "last_updated": "2026-02-10"
+  },
+  "core_products": [
+    {
+      "name": "Universal Scraper API",
+      "description": "Single API endpoint for all web scraping needs with automatic anti-bot bypass",
+      "endpoint": "https://api.zenrows.com/v1/",
+      "use_cases": ["Dynamic websites", "JavaScript-heavy sites", "Protected websites", "Data extraction at scale"]
+    },
+    {
+      "name": "Scraping Browser",
+      "description": "Cloud infrastructure for Puppeteer and Playwright with built-in anti-bot bypassing",
+      "protocols": ["WebSocket", "CDP (Chrome DevTools Protocol)"],
+      "use_cases": ["Browser automation", "Complex interactions", "Sophisticated fingerprint management"]
+    },
+    {
+      "name": "Residential Proxies",
+      "description": "55M+ premium IPs with geotargeting",
+      "coverage": "190+ countries",
+      "features": ["Auto-rotation", "Sticky sessions", "Geotargeting"]
+    }
+  ],
+  "api_parameters": {
+    "authentication": {
+      "parameter": "apikey",
+      "type": "string",
+      "required": true,
+      "location": "query parameter",
+      "description": "Your ZenRows API key for authentication",
+      "notes": "Can be stored in environment variable (ZENROWS_API_KEY)"
+    },
+    "target_url": {
+      "parameter": "url",
+      "type": "string (URL)",
+      "required": true,
+      "description": "The target URL to scrape",
+      "notes": "Must be properly encoded"
+    },
+    "javascript_rendering": {
+      "parameter": "js_render",
+      "type": "boolean",
+      "default": false,
+      "credit_cost": "5x base rate",
+      "description": "Render JavaScript on the page with a headless browser",
+      "requirements": "Required for js_instructions, wait, wait_for"
+    },
+    "premium_proxy": {
+      "parameter": "premium_proxy",
+      "type": "boolean",
+      "default": false,
+      "credit_cost": "10x base rate",
+      "description": "Use premium residential proxies",
+      "notes": "Required for proxy_country"
+    },
+    "combined_js_proxy": {
+      "cost": "25x base rate",
+      "description": "When both js_render=true and premium_proxy=true"
+    },
+    "proxy_country": {
+      "parameter": "proxy_country",
+      "type": "string (country code)",
+      "default": null,
+      "description": "Geolocation of the IP (2-letter country code, e.g., 'us', 'es')",
+      "requirements": "Requires premium_proxy=true",
+      "coverage": "190+ countries supported",
+      "limitations": "Country-level only, no city/state targeting"
+    },
+    "session_id": {
+      "parameter": "session_id",
+      "type": "integer",
+      "range": "1-99999",
+      "default": null,
+      "duration": "10 minutes",
+      "description": "Use the same IP for all requests with the same session ID",
+      "use_cases": ["Maintaining sessions", "Avoiding IP rotation detection"]
+    },
+    "css_extractor": {
+      "parameter": "css_extractor",
+      "type": "JSON string",
+      "default": null,
+      "description": "Define CSS selectors to extract data as JSON",
+      "features": ["Automatic array creation for multiple matches", "Attribute extraction with @ syntax"],
+      "examples": [
+        "{\"title\": \"h1\"}",
+        "{\"links\": \"a @href\"}",
+        "{\"title\": \"h1\", \"products\": \".product-name\"}"
+      ]
+    },
+    "autoparse": {
+      "parameter": "autoparse",
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically extract structured data using custom parsers",
+      "status": "Experimental phase",
+      "supported_sites": ["Amazon", "YouTube", "Zillow", "E-commerce platforms", "Travel sites", "Marketplaces", "SERPs", "Real estate listings"],
+      "output_format": "JSON",
+      "limitations": "Does not work on all domains"
+    },
+    "wait": {
+      "parameter": "wait",
+      "type": "integer (milliseconds)",
+      "default": null,
+      "requirements": "Requires js_render=true",
+      "description": "Wait a fixed amount of time before capturing",
+      "timeout": "40 seconds max for all js_instructions"
+    },
+    "wait_for": {
+      "parameter": "wait_for",
+      "type": "string (CSS selector)",
+      "default": null,
+      "requirements": "Requires js_render=true",
+      "description": "Wait for a CSS selector to appear in the DOM"
+    },
+    "wait_event_types": {
+      "networkidle": "No network requests for 500ms (ideal for SPAs)",
+      "networkalmostidle": "No more than 2 network requests for 500ms",
+      "load": "Page load event fired (all resources loaded)",
+      "domcontentloaded": "DOM parsing completed"
+    },
+    "js_instructions": {
+      "parameter": "js_instructions",
+      "type": "JSON array",
+      "default": null,
+      "requirements": "Requires js_render=true",
+      "timeout": "40 seconds",
+      "description": "Execute dynamic interactions and custom JavaScript",
+      "actions": [
+        {
+          "name": "click",
+          "description": "Click elements using CSS selectors or XPath",
+          "performance": "50-200ms"
+        },
+        {
+          "name": "scroll",
+          "description": "Scroll the page"
+        },
+        {
+          "name": "fill",
+          "description": "Fill form inputs"
+        },
+        {
+          "name": "check",
+          "description": "Check checkboxes"
+        },
+        {
+          "name": "uncheck",
+          "description": "Uncheck checkboxes"
+        },
+        {
+          "name": "select_option",
+          "description": "Select dropdown options"
+        },
+        {
+          "name": "evaluate",
+          "description": "Execute arbitrary JavaScript code",
+          "use_cases": ["Modify page styling", "Trigger custom events", "Access page data", "Remove overlays", "Trigger infinite scroll", "Click multiple elements"]
+        }
+      ],
+      "selector_support": ["CSS selectors", "XPath expressions"]
+    },
+    "window_dimensions": {
+      "window_width": {
+        "parameter": "window_width",
+        "type": "integer",
+        "default": 1920,
+        "description": "Browser window width in pixels"
+      },
+      "window_height": {
+        "parameter": "window_height",
+        "type": "integer",
+        "default": 1080,
+        "description": "Browser window height in pixels"
+      }
+    },
+    "device": {
+      "parameter": "device",
+      "type": "string",
+      "default": "desktop",
+      "options": ["desktop", "mobile"],
+      "description": "Automatically use desktop or mobile user agents"
+    },
+    "custom_headers": {
+      "parameter": "custom_headers",
+      "type": "http.Header object",
+      "description": "Set custom headers in the request",
+      "notes": "Overwrites default headers",
+      "managed_headers": ["User-Agent", "Accept-Encoding", "Sec-Fetch-*", "Client-Hints", "Sec-Ch-Ua"],
+      "restrictions": "Cannot manually override managed headers"
+    },
+    "block_resources": {
+      "parameter": "block_resources",
+      "type": "string (comma-separated)",
+      "default": null,
+      "requirements": "Only available with js_render=true",
+      "description": "Block specific resources from loading",
+      "options": ["stylesheet", "image", "media", "xhr"],
+      "example": "block_resources=stylesheet,image,media,xhr",
+      "benefit": "Speeds up scraping"
+    },
+    "json_response": {
+      "parameter": "json_response",
+      "type": "boolean",
+      "default": false,
+      "description": "Get content in JSON format including XHR/Fetch requests"
+    },
+    "response_type": {
+      "parameter": "response_type",
+      "type": "string",
+      "options": ["markdown", "plaintext", "pdf"],
+      "default": null,
+      "description": "Convert scraped content to specified format",
+      "markdown": {
+        "description": "Returns content in Markdown format",
+        "use_cases": ["Easier reading", "Documentation", "Content processing"]
+      },
+      "plaintext": {
+        "description": "Strips HTML tags and returns clean plain text",
+        "use_cases": ["NLP", "Summarization", "Archiving"]
+      },
+      "pdf": {
+        "requirements": "Requires js_render=true",
+        "description": "Generates PDF version of scraped content",
+        "use_cases": ["Archiving web pages", "Documentation", "Reports", "Offline reading"]
+      },
+      "limitations": "Cannot use multiple response_type formats together"
+    },
+    "screenshot": {
+      "return_screenshot": {
+        "parameter": "return_screenshot",
+        "type": "boolean",
+        "default": false,
+        "description": "Return a screenshot of the target page"
+      },
+      "screenshot_format": {
+        "parameter": "screenshot_format",
+        "type": "string",
+        "options": ["png", "jpeg"],
+        "default": "png",
+        "description": "Screenshot file format"
+      },
+      "screenshot_quality": {
+        "parameter": "screenshot_quality",
+        "type": "integer",
+        "range": "1-100",
+        "default": null,
+        "requirements": "Only for JPEG format",
+        "description": "Balance image clarity and file size"
+      },
+      "screenshot_types": ["Viewport", "Full page", "Specific element"],
+      "output_formats": ["PNG", "JPG", "JSON (base64 encoded)"]
+    },
+    "resolve_captcha": {
+      "parameter": "resolve_captcha",
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically solve interactive CAPTCHAs",
+      "supported_types": ["reCAPTCHA variants", "Cloudflare Turnstile", "DataDome", "GeeTest"],
+      "integrations": ["2Captcha"],
+      "approach": "Automated bypass with free retries, fallback to human solvers",
+      "pricing": "Only pay for successful requests"
+    },
+    "solve_captcha": {
+      "parameter": "solve_captcha",
+      "type": "JSON object",
+      "description": "Specify CAPTCHA type to solve",
+      "example": "{\"solve_captcha\": {\"type\": \"cloudflare_turnstile\"}}"
+    },
+    "allowed_status_codes": {
+      "parameter": "allowed_status_codes",
+      "type": "array/list",
+      "default": null,
+      "description": "Return response body even for non-2xx status codes",
+      "notes": "You will be charged for unsuccessful requests matching specified status codes",
+      "use_cases": ["Accessing 404/500 error pages", "Custom error handling"]
+    },
+    "original_status": {
+      "parameter": "original_status",
+      "type": "boolean",
+      "default": false,
+      "description": "Returns the status code provided by the website",
+      "use_cases": ["Error detection", "Monitoring"]
+    },
+    "file_download": {
+      "supported": true,
+      "file_types": ["Images", "PDFs", "Any binary file"],
+      "size_limit": "10MB",
+      "recommendation": "Not recommended for large files",
+      "method": "Store response.content directly in binary mode"
+    }
+  },
+  "anti_bot_capabilities": {
+    "supported_protections": [
+      {
+        "name": "Cloudflare",
+        "bypass_method": "Automatic via Universal Scraper API",
+        "features": ["Turnstile CAPTCHA solver", "Challenge bypass", "Fingerprint evasion"]
+      },
+      {
+        "name": "DataDome",
+        "bypass_method": "Advanced fingerprinting and residential proxies",
+        "features": ["CAPTCHA bypass", "Behavioral mimicry"]
+      },
+      {
+        "name": "PerimeterX",
+        "bypass_method": "Auto-rotating User Agents, premium proxies, anti-CAPTCHA",
+        "features": ["Continuous adaptation to updates"]
+      },
+      {
+        "name": "All major anti-bot systems",
+        "description": "Automatically handled through fingerprinting and residential proxies"
+      }
+    ],
+    "techniques": [
+      "Advanced fingerprinting",
+      "Residential proxy rotation",
+      "CAPTCHA bypassing",
+      "JavaScript rendering",
+      "Request header management",
+      "Behavioral mimicry",
+      "Realistic browser fingerprints",
+      "Consistent fingerprints across requests"
+    ],
+    "fingerprint_types": [
+      "Browser fingerprinting",
+      "Device fingerprinting",
+      "Canvas fingerprinting",
+      "WebGL fingerprinting",
+      "TLS fingerprinting",
+      "HTTP/2 fingerprinting"
+    ],
+    "tools": [
+      {
+        "name": "fingerprint-suite",
+        "description": "Generate and inject browser fingerprints",
+        "compatibility": ["Puppeteer", "Playwright"],
+        "limitation": "Doesn't capture all essential leakages"
+      }
+    ]
+  },
+  "proxy_capabilities": {
+    "ip_pool_size": "55M+",
+    "country_coverage": "190+ countries",
+    "proxy_types": [
+      {
+        "name": "Residential Proxies",
+        "description": "IP addresses from ISPs assigned to homeowners",
+        "trustworthiness": "High",
+        "cost": "Starting at $5.5/GB"
+      },
+      {
+        "name": "Datacenter Proxies",
+        "description": "Artificially created IPs from datacenters",
+        "trustworthiness": "Lower",
+        "detection_risk": "Higher"
+      }
+    ],
+    "rotation_types": [
+      {
+        "name": "Rotating Proxies",
+        "description": "New IP per request from large pool",
+        "default": true
+      },
+      {
+        "name": "Sticky Proxies",
+        "description": "Single IP for specified duration",
+        "implementation": "Use session_id parameter",
+        "duration": "10 minutes"
+      }
+    ],
+    "geotargeting": {
+      "level": "Country-level only",
+      "parameter": "proxy_country",
+      "format": "2-letter country code",
+      "requirement": "premium_proxy=true",
+      "limitations": "No city/state targeting"
+    },
+    "performance": {
+      "uptime": "99.9%",
+      "average_response_time": "0.35 seconds"
+    }
+  },
+  "concurrency_and_limits": {
+    "concurrency": {
+      "description": "Number of simultaneous API requests allowed",
+      "free_trial": 5,
+      "minimum": 10,
+      "maximum": 100,
+      "products": {
+        "universal_scraper_api": "Up to 100 concurrent requests",
+        "scraping_browser": "Up to 100 concurrent requests"
+      },
+      "response_headers": {
+        "concurrency_limit": "Total concurrent requests allowed",
+        "concurrency_remaining": "Available concurrency slots"
+      },
+      "error_code": "429 Too Many Requests",
+      "error_handling": "Temporary IP ban if repeatedly exceeded"
+    },
+    "rate_limiting": {
+      "description": "Total requests allowed in set time period",
+      "distinction": "Different from concurrency"
+    },
+    "timeouts": {
+      "minimum_recommended": "3 minutes",
+      "js_instructions_timeout": "40 seconds",
+      "session_timeout": "10 minutes",
+      "reason": "Canceled requests don't release concurrency until server processing completes"
+    },
+    "request_limits": {
+      "response_size": {
+        "description": "Maximum response size per request",
+        "varies_by_plan": true,
+        "error_code": "413 Content Too Large"
+      },
+      "file_download_limit": "10MB"
+    }
+  },
+  "pricing_and_billing": {
+    "pricing_model": "Subscription with shared monthly balance",
+    "credit_system": {
+      "description": "Each request costs credits based on features used",
+      "base_request": "$0.28 per 1,000 (Business plan: $0.10)",
+      "js_rendering": "5x base rate",
+      "premium_proxies": "10x base rate",
+      "js_and_proxies": "25x base rate"
+    },
+    "pricing_tiers": [
+      {
+        "name": "Free Trial",
+        "duration": "14 days",
+        "api_requests": 1000,
+        "usage_limit": "$1",
+        "credit_card_required": false,
+        "concurrency": 5
+      },
+      {
+        "name": "Developer",
+        "price": "$69/month",
+        "basic_results": 250000,
+        "protected_results": 10000,
+        "scraper_api_beta": "1,000 calls",
+        "scraping_browser": "0.1 GB"
+      },
+      {
+        "name": "Startup",
+        "price": "$129/month"
+      },
+      {
+        "name": "Business",
+        "price": "$299/month",
+        "concurrency": 100,
+        "features": ["Advanced Analytics"]
+      },
+      {
+        "name": "Business 500",
+        "price": "$499/month"
+      },
+      {
+        "name": "Business 1K",
+        "price": "$999/month"
+      },
+      {
+        "name": "Business 2K",
+        "price": "$1999/month"
+      },
+      {
+        "name": "Business 3K",
+        "price": "$2999/month"
+      },
+      {
+        "name": "Enterprise",
+        "price": "Custom quote"
+      }
+    ],
+    "discounts": {
+      "3_month": "Discounted pricing",
+      "6_month": "Discounted pricing",
+      "yearly": "10% discount"
+    },
+    "top_ups": {
+      "description": "Prepaid credits to extend usage",
+      "amount": "15% of plan value",
+      "frequency": "Up to 4 times per month",
+      "example": "Business 300 plan: $44.99 per top-up",
+      "auto_top_up": "Can trigger automatically at chosen threshold (e.g., 95%)"
+    },
+    "billing_rules": {
+      "successful_requests_only": true,
+      "404_410_count_as_successful": true,
+      "failed_requests_not_billed": true,
+      "retried_requests_not_billed": true
+    },
+    "refund_policy": {
+      "type": "Prorated refund for unused portion",
+      "condition": "If less than 15% consumed",
+      "threshold": "Over 15% consumed = fully provided",
+      "withdrawal_right": "Does not apply to recurring subscriptions",
+      "cancellation_method": "Email success@zenrows.com"
+    }
+  },
+  "sdks_and_integration": {
+    "official_sdks": [
+      {
+        "language": "Python",
+        "package": "zenrows",
+        "repository": "https://github.com/ZenRows/zenrows-python-sdk",
+        "package_manager": "PyPI",
+        "features": ["Automatic retry with exponential backoff", "Proxy rotation", "Headless browsers", "CAPTCHA handling"]
+      },
+      {
+        "language": "Node.js",
+        "package": "zenrows",
+        "repository": "https://github.com/ZenRows/zenrows-node-sdk",
+        "package_manager": "npm",
+        "features": ["Examples in JS and TS", "Proxy rotation", "Headless browsers", "CAPTCHA handling"]
+      },
+      {
+        "language": "Go",
+        "repository": "https://github.com/ZenRows/zenrows-go-sdk",
+        "features": ["HTTP request handling", "Response management", "Configuration management"]
+      },
+      {
+        "language": "PHP",
+        "status": "Supported but limited documentation"
+      },
+      {
+        "language": "Ruby",
+        "status": "Supported but limited documentation"
+      },
+      {
+        "language": "Java",
+        "status": "Supported"
+      },
+      {
+        "language": "C#",
+        "status": "Supported"
+      }
+    ],
+    "http_methods_supported": ["GET", "POST", "PUT", "DELETE"],
+    "browser_automation": {
+      "puppeteer": {
+        "connection_method": "WebSocket endpoint",
+        "integration": "Direct connection to cloud Chrome instances"
+      },
+      "playwright": {
+        "connection_method": "CDP (Chrome DevTools Protocol)",
+        "connection_function": "chromium.connectOverCDP()"
+      }
+    },
+    "no_code_integrations": [
+      {
+        "name": "n8n",
+        "type": "Workflow automation platform",
+        "features": ["Visual interface", "Self-hostable", "Node-based workflow editor"]
+      },
+      {
+        "name": "Pipedream",
+        "type": "Workflow automation platform",
+        "features": ["Automated data collection and processing"]
+      },
+      {
+        "name": "Zapier",
+        "type": "Workflow automation platform",
+        "features": ["Connect to CRMs, databases, Slack"]
+      },
+      {
+        "name": "Make",
+        "type": "Workflow automation platform",
+        "features": ["Visual workflow builder"]
+      }
+    ]
+  },
+  "retry_and_error_handling": {
+    "automatic_retries": {
+      "enabled_by_default": false,
+      "retry_status_codes": [429, 500, 502, 503, 504],
+      "retry_logic": "Exponential backoff",
+      "backoff_formula": "backoff_factor × (2^(number of total retries - 1))",
+      "example": "Backoff factor of 1 = 1s, 2s, 4s delays for 3 retries",
+      "sdk_feature": "Python SDK includes exponential back-off automatically"
+    },
+    "error_codes": {
+      "429": "Too Many Requests (concurrency limit exceeded)",
+      "413": "Content Too Large (response size exceeded)",
+      "timeout": "Request exceeded maximum allowed time"
+    },
+    "error_handling_recommendations": [
+      "Check if target website is slow",
+      "Reduce request complexity",
+      "Try premium proxies with geolocation",
+      "Use allowed_status_codes for non-2xx handling"
+    ]
+  },
+  "response_features": {
+    "response_headers": [
+      {
+        "name": "Concurrency-Limit",
+        "description": "Total concurrent requests allowed by plan"
+      },
+      {
+        "name": "Concurrency-Remaining",
+        "description": "Available concurrency slots"
+      },
+      {
+        "name": "Zr-Final-Url",
+        "description": "Final URL after redirects"
+      }
+    ],
+    "output_formats": [
+      "HTML (default)",
+      "JSON",
+      "Markdown",
+      "Plain text",
+      "PDF",
+      "Screenshot (PNG/JPEG/JSON)"
+    ],
+    "data_extraction": {
+      "css_selectors": {
+        "syntax": "Standard CSS selector syntax",
+        "attribute_extraction": "Use @ symbol (e.g., 'a @href')",
+        "automatic_arrays": "Multiple matches returned as arrays"
+      },
+      "xpath_support": {
+        "available": true,
+        "use_case": "Complex hierarchical layouts, bidirectional traversal",
+        "comparison": "More powerful than CSS but less intuitive"
+      },
+      "structured_data": {
+        "tables": "Extracted with dimensions, headings, content",
+        "lists": "Extracted as arrays",
+        "grids": "Support for product grids and similar layouts"
+      }
+    },
+    "redirect_handling": {
+      "automatic": true,
+      "final_url_header": "Zr-Final-Url",
+      "description": "Automatically follows redirects and returns final URL"
+    }
+  },
+  "advanced_analytics": {
+    "availability": "Business and higher plans",
+    "features": [
+      {
+        "name": "Timeline View",
+        "description": "Visualize requests, costs, success/failure rates over time"
+      },
+      {
+        "name": "Granular Usage Insights",
+        "description": "Filter and analyze by custom date ranges"
+      },
+      {
+        "name": "Domain/Subdomain Analytics",
+        "description": "Track usage and performance by domain"
+      },
+      {
+        "name": "Usage & Performance Metrics",
+        "description": "Monitor spending, request volume, success/failure rates, HTTP status codes"
+      },
+      {
+        "name": "Concurrency Insights",
+        "description": "Monitor concurrent request limits and resource usage"
+      }
+    ],
+    "benefits": [
+      "Identify trends",
+      "Optimize scraping strategy",
+      "Maintain cost visibility",
+      "Track resource usage"
+    ]
+  },
+  "compliance_and_security": {
+    "gdpr_compliance": {
+      "status": "Fully compliant",
+      "location": "Spain (European Union)",
+      "regulation": "EU General Data Protection Regulation (GDPR)"
+    },
+    "data_processing_agreement": {
+      "acceptance": "Automatic upon becoming customer",
+      "safeguards": "Administrative, technical, and physical measures"
+    },
+    "hosting": {
+      "provider": "Digital Ocean",
+      "security_audits": "Regular audits following recommended security guidelines"
+    },
+    "data_security": {
+      "measures": "All reasonable technical and organizational measures",
+      "protection_against": ["Accidental loss", "Unlawful destruction", "Alteration", "Disclosure", "Unauthorized access"]
+    },
+    "data_retention": {
+      "after_deletion": "Only data required for legal bookkeeping",
+      "retained_data": "Invoices and payment records"
+    },
+    "security_breach_response": {
+      "notification": "Prompt notification to Data Controller",
+      "investigation": "Thorough investigation",
+      "information_provided": "Details about the breach"
+    }
+  },
+  "support_and_documentation": {
+    "support_channels": [
+      {
+        "type": "Email/Help Desk",
+        "contact": "success@zenrows.com"
+      },
+      {
+        "type": "Chat",
+        "availability": "Available"
+      },
+      {
+        "type": "Knowledge Base",
+        "url": "https://www.zenrows.com/knowledge"
+      },
+      {
+        "type": "FAQs/Forum",
+        "availability": "Available"
+      }
+    ],
+    "response_quality": "Positive user feedback on responsiveness and helpfulness",
+    "documentation": {
+      "main_docs": "https://docs.zenrows.com/",
+      "api_reference": "https://docs.zenrows.com/universal-scraper-api/api-reference",
+      "integrations": "https://docs.zenrows.com/integrations/overview",
+      "troubleshooting": "https://docs.zenrows.com/universal-scraper-api/troubleshooting/troubleshooting-guide"
+    },
+    "code_samples": {
+      "availability": "Extensive",
+      "languages": ["Python", "Node.js", "JavaScript", "TypeScript"],
+      "features": ["Quick examples", "Common use-cases", "Recipes", "Integration examples"]
+    },
+    "request_builder": {
+      "description": "Interactive tool for testing and generating code",
+      "features": ["Visual parameter selection", "Code generation", "Live testing"]
+    }
+  },
+  "performance_metrics": {
+    "uptime": "99.9%",
+    "average_response_time": "0.35 seconds (residential proxies)",
+    "browser_availability": "Instantly available",
+    "scaling": "On-demand scale-up",
+    "click_performance": "50-200ms",
+    "wait_for_element": "Several seconds"
+  },
+  "limitations_and_considerations": {
+    "autoparse_limitations": [
+      "Experimental phase",
+      "Does not work on all domains",
+      "Limited website coverage"
+    ],
+    "screenshot_limitations": [
+      "10MB size limit for file downloads"
+    ],
+    "geotargeting_limitations": [
+      "Country-level only (no city/state targeting)"
+    ],
+    "response_type_limitations": [
+      "Cannot use markdown, plaintext, and PDF together"
+    ],
+    "managed_headers": [
+      "Cannot manually override: Sec-Ch-Ua, Accept-Encoding, Sec-Fetch-*"
+    ],
+    "timeout_considerations": [
+      "Minimum 3 minutes recommended",
+      "JS instructions timeout at 40 seconds",
+      "Canceled requests don't release concurrency immediately"
+    ],
+    "fingerprint_suite_limitation": [
+      "Does not capture all essential leakages",
+      "Anti-bot measures can still detect leaks"
+    ],
+    "user_feedback": [
+      "Dashboard is functional but not intuitive",
+      "Some users want longer list of autoparse-supported websites"
+    ]
+  },
+  "comparison_with_alternatives": {
+    "vs_scraperapi": {
+      "zenrows_strengths": ["Well-rounded solution", "Good for moderate volumes"],
+      "zenrows_weaknesses": ["Request limits shrink fast with advanced features", "Pricing jumps with JS/proxies"],
+      "scraperapi_strengths": ["Better automation", "Better pricing for high volume", "More efficient", "Simpler", "Predictable costs"]
+    },
+    "vs_apify": {
+      "zenrows_strengths": ["Simple API with anti-bot bypass"],
+      "zenrows_weaknesses": ["No integrated cloud solution for data extraction flows"],
+      "apify_strengths": ["Full-stack cloud platform", "Serverless 'Actors'", "Integrated data management"]
+    },
+    "vs_bright_data": {
+      "zenrows_strengths": ["More accessible pricing", "Easier to get started"],
+      "bright_data_strengths": ["72M+ IPs", "195+ locations", "Enterprise-scale", "Industry-leading infrastructure"],
+      "bright_data_weaknesses": ["Starting at $499/month", "Targets large enterprises"]
+    }
+  },
+  "use_cases": {
+    "common_applications": [
+      "Competitive pricing monitoring",
+      "Lead generation and enrichment",
+      "Market intelligence collection",
+      "E-commerce data extraction",
+      "Real estate listings scraping",
+      "SERP data collection",
+      "Travel site scraping",
+      "Content aggregation",
+      "Social media monitoring",
+      "Academic research"
+    ],
+    "integration_examples": [
+      "Monitor competitor pricing with Playwright/Puppeteer",
+      "Automate lead enrichment with Clay",
+      "Power AI-driven research with Lindy",
+      "Scale scraping operations with n8n or Make",
+      "Send scraped data to CRMs/databases/Slack"
+    ]
+  },
+  "technical_insights": {
+    "common_patterns": [
+      "Use session_id for consistent IP across related requests",
+      "Combine css_extractor with js_render for dynamic content",
+      "Use block_resources to speed up scraping",
+      "Implement exponential backoff for retries",
+      "Monitor concurrency headers to optimize parallel requests"
+    ],
+    "best_practices": [
+      "Start with basic requests, add features only when needed",
+      "Use CSS selectors for simple extraction, XPath for complex hierarchies",
+      "Set appropriate timeouts (minimum 3 minutes)",
+      "Store API key in environment variables",
+      "Monitor usage with Advanced Analytics on Business+ plans",
+      "Use auto top-ups to prevent scraping interruptions",
+      "Test with Request Builder before implementing",
+      "Check Concurrency-Remaining header before batch requests"
+    ],
+    "pitfalls": [
+      "Don't use js_render unless necessary (5x cost)",
+      "Don't combine js_render + premium_proxy unless required (25x cost)",
+      "Avoid setting timeout below 3 minutes",
+      "Don't exceed concurrency limits (causes 429 errors)",
+      "Not recommended for downloading files over 10MB",
+      "Can't use multiple response_type formats simultaneously"
+    ],
+    "emerging_trends": [
+      "Increased focus on fingerprint evasion",
+      "Integration with AI/LLM workflows",
+      "No-code automation platforms gaining popularity",
+      "Shift toward API-based scraping vs manual browser automation"
+    ]
+  },
+  "implementation_recommendations": [
+    {
+      "scenario": "Simple static website scraping",
+      "recommended_solution": "Basic API call without js_render or premium_proxy",
+      "rationale": "Minimize cost while maintaining effectiveness"
+    },
+    {
+      "scenario": "JavaScript-heavy SPA scraping",
+      "recommended_solution": "js_render=true with wait_for or wait parameters",
+      "rationale": "Ensure dynamic content loads before extraction"
+    },
+    {
+      "scenario": "Scraping protected sites (Cloudflare, DataDome)",
+      "recommended_solution": "js_render=true + premium_proxy=true + resolve_captcha=true",
+      "rationale": "Maximum anti-bot bypass capability"
+    },
+    {
+      "scenario": "Geo-restricted content",
+      "recommended_solution": "premium_proxy=true + proxy_country parameter",
+      "rationale": "Access localized content from specific countries"
+    },
+    {
+      "scenario": "Session-based scraping",
+      "recommended_solution": "Use session_id parameter with same value across requests",
+      "rationale": "Maintain consistent IP for session tracking"
+    },
+    {
+      "scenario": "High-volume scraping",
+      "recommended_solution": "Business plan + parallel requests respecting concurrency limits",
+      "rationale": "Maximize throughput while avoiding 429 errors"
+    },
+    {
+      "scenario": "Structured data extraction",
+      "recommended_solution": "css_extractor parameter or autoparse for supported sites",
+      "rationale": "Get JSON output directly without manual parsing"
+    },
+    {
+      "scenario": "Form submission and interaction",
+      "recommended_solution": "js_render=true + js_instructions with fill, click, evaluate",
+      "rationale": "Automate complex user interactions"
+    },
+    {
+      "scenario": "Monitoring and archiving",
+      "recommended_solution": "response_type=pdf or return_screenshot=true",
+      "rationale": "Create permanent records of web content"
+    }
+  ],
+  "community_insights": {
+    "popular_solutions": [
+      "API-based scraping over manual browser automation",
+      "Using no-code platforms (n8n, Pipedream) for orchestration",
+      "Combining ZenRows with 2captcha for CAPTCHA handling",
+      "Leveraging residential proxies for protection bypass"
+    ],
+    "controversial_topics": [
+      "Cost-effectiveness compared to alternatives at high volumes",
+      "Limited autoparse website coverage",
+      "Dashboard UX could be improved"
+    ],
+    "expert_opinions": [
+      "ZenRows prioritizes ease of use over complex ecosystems",
+      "Good balance of features for SMB market",
+      "Strong anti-bot capabilities but price increases with features",
+      "Integration time typically under 5 minutes"
+    ]
+  },
+  "version_and_compatibility": {
+    "api_version": "v1",
+    "endpoint": "https://api.zenrows.com/v1/",
+    "backward_compatibility": "No specific information available",
+    "breaking_changes": "Not documented in public sources"
+  }
+}
