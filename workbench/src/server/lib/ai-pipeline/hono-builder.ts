@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -11,7 +12,10 @@ import { eq } from "drizzle-orm";
 import { ensureNetwork } from "../network.js";
 import { insertContainer, updateContainerId, updateContainerStatus } from "../container-store.js";
 
-const TEMPLATE_DIR = path.join(process.cwd(), "templates", "hono-service");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// hono-builder.ts lives at workbench/src/server/lib/ai-pipeline/, template lives at workbench/templates/hono-service/
+const TEMPLATE_DIR = path.resolve(__dirname, "..", "..", "..", "..", "templates", "hono-service");
 
 export interface HonoBuildInput {
   jobId: number;
