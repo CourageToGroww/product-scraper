@@ -1,18 +1,19 @@
 import { describe, it, expect, afterAll } from "vitest";
 import Docker from "dockerode";
-import { ensureNetwork, NETWORK_NAME } from "./network.js";
+import { ensureNetwork, networkExists, NETWORK_NAME } from "./network.js";
 
 const docker = new Docker();
+const dockerAvailable = await docker.ping().then(() => true).catch(() => false);
 
 describe("ensureNetwork", () => {
   afterAll(async () => {
+    if (!dockerAvailable) return;
     try {
-      const net = docker.getNetwork(NETWORK_NAME);
-      await net.remove();
+      await docker.getNetwork(NETWORK_NAME).remove();
     } catch { /* may already be gone */ }
   });
 
-  it("creates the network when missing", async () => {
+  it.skipIf(!dockerAvailable)("creates the network when missing", async () => {
     try {
       await docker.getNetwork(NETWORK_NAME).remove();
     } catch { /* ok */ }
@@ -23,12 +24,17 @@ describe("ensureNetwork", () => {
     expect(list.some(n => n.Name === NETWORK_NAME)).toBe(true);
   });
 
-  it("is idempotent when network already exists", async () => {
+  it.skipIf(!dockerAvailable)("is idempotent when network already exists", async () => {
     await ensureNetwork();
-    await ensureNetwork(); // second call must not throw
+    await ensureNetwork();
 
     const list = await docker.listNetworks({ filters: { name: [NETWORK_NAME] } });
     const matches = list.filter(n => n.Name === NETWORK_NAME);
     expect(matches.length).toBe(1);
+  });
+
+  it.skipIf(!dockerAvailable)("networkExists returns true after ensureNetwork", async () => {
+    await ensureNetwork();
+    expect(await networkExists()).toBe(true);
   });
 });
