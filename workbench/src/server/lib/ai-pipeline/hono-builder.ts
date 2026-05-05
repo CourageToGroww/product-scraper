@@ -10,7 +10,7 @@ import { db } from "../db.js";
 import { honoServices } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import { ensureNetwork } from "../network.js";
-import { insertContainer, updateContainerId, updateContainerStatus } from "../container-store.js";
+import { insertContainer, updateContainerId, updateContainerStatus, getContainerBySlug } from "../container-store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,19 +39,45 @@ export async function buildAndSpawnHonoService(input: HonoBuildInput): Promise<H
 
   // Place generated schema.ts under api/src/
   fs.writeFileSync(path.join(jobDir, "src", "schema.ts"), input.schemaSource, "utf-8");
-  // (Routes are written by Task 8's persistRoutesToDisk before this is called.)
+  // (Routes are written by persistRoutesToDisk before this is called.)
 
   const slug = `job-${input.jobId}-api`;
-  const containerName = `scrapekit-${slug}`;
   const imageTag = `scrapekit-${slug}:latest`;
 
   // Build image via shell `docker build`
   await execAsync(`docker build -t ${imageTag} ${jobDir}`);
 
-  // Allocate a host port (range 6500-6999 for job APIs)
-  const port = await findAvailableApiPort();
-
   const password = crypto.randomBytes(8).toString("base64url");
+
+  // Retry port allocation in case of OS-level collision
+  const exclude = new Set<number>();
+  let port = -1;
+  let containerId = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    port = await findAvailableApiPort(exclude);
+    const containerName = `scrapekit-${slug}-${port}`;
+    try {
+      await execAsync(
+        `docker run -d --name ${containerName} --network scrapekit-net ` +
+        `--add-host=host.docker.internal:host-gateway ` +
+        `-p ${port}:3001 -e DATABASE_URL=${JSON.stringify(input.jobDbConnectionUrl)} ${imageTag}`
+      );
+      const psResult = await execAsync(`docker ps -q -f name=^${containerName}$`);
+      containerId = psResult.stdout.trim();
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/port is already allocated|address already in use|EADDRINUSE/i.test(msg)) {
+        exclude.add(port);
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!containerId) {
+    throw new Error("Could not find an available port for the Hono container after 5 attempts");
+  }
+
   await insertContainer({
     slug,
     name: `Job #${input.jobId} API`,
@@ -62,24 +88,8 @@ export async function buildAndSpawnHonoService(input: HonoBuildInput): Promise<H
     datasetId: null,
     dataPath: jobDir,
   });
-
-  let containerId = "";
-  try {
-    await execAsync(
-      `docker run -d --name ${containerName} --network scrapekit-net ` +
-      `--add-host=host.docker.internal:host-gateway ` +
-      `-p ${port}:3001 -e DATABASE_URL=${JSON.stringify(input.jobDbConnectionUrl)} ${imageTag}`
-    );
-    const psResult = await execAsync(`docker ps -q -f name=^${containerName}$`);
-    containerId = psResult.stdout.trim();
-    await updateContainerId(slug, containerId);
-    await updateContainerStatus(slug, "running");
-  } catch (err) {
-    await updateContainerStatus(slug, "error").catch(() => {
-      // swallow secondary error
-    });
-    throw err;
-  }
+  await updateContainerId(slug, containerId);
+  await updateContainerStatus(slug, "running");
 
   const [serviceRow] = await db
     .insert(honoServices)
@@ -120,13 +130,13 @@ function copyRecursiveSync(src: string, dest: string) {
   }
 }
 
-async function findAvailableApiPort(): Promise<number> {
+async function findAvailableApiPort(exclude: Set<number> = new Set()): Promise<number> {
   const used = await db
     .select({ port: honoServices.port })
     .from(honoServices)
     .then((rows) => new Set(rows.map((r) => r.port)));
   for (let p = 6500; p <= 6999; p++) {
-    if (!used.has(p)) return p;
+    if (!used.has(p) && !exclude.has(p)) return p;
   }
   throw new Error("No available API port in 6500-6999");
 }
@@ -142,10 +152,15 @@ export async function destroyHonoService(honoServiceId: number): Promise<void> {
   if (!row) return;
 
   const apiSlug = `job-${row.jobId}-api`;
-  const containerName = `scrapekit-${apiSlug}`;
+
+  // Look up actual container name via the containers table by slug; fall back to legacy name.
+  const containerRow = await getContainerBySlug(apiSlug);
+  const containerName = containerRow?.containerId || `scrapekit-${apiSlug}`;
 
   try { await execAsync(`docker rm -f ${containerName}`); } catch { /* ignore */ }
-  try { await execAsync(`docker rmi ${row.imageTag}`); } catch { /* ignore */ }
+  if (row.imageTag) {
+    try { await execAsync(`docker rmi ${row.imageTag}`); } catch { /* ignore */ }
+  }
 
   await db.update(honoServices).set({ status: "stopped" }).where(eq(honoServices.id, honoServiceId));
   await updateContainerStatus(apiSlug, "destroyed").catch(() => { /* ignore */ });
