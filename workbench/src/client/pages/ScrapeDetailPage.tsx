@@ -83,6 +83,12 @@ export default function ScrapeDetailPage() {
         {job.status === "completed" && (
           <div className="flex items-center gap-2" style={{ marginLeft: "auto" }}>
             <Link
+              to={`/scrapes/${jobId}/api`}
+              style={{ padding: "0.4rem 0.75rem", border: "1px solid #ddd", borderRadius: "0.25rem", textDecoration: "none" }}
+            >
+              AI Pipeline
+            </Link>
+            <Link
               to={`/scrapes/${id}/build`}
               className="btn-ghost no-underline flex items-center gap-1.5"
               style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem" }}

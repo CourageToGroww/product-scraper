@@ -142,7 +142,33 @@ export const settings = {
     deepseekApiKey?: string;
     kimiApiKey?: string;
   }) => request<{ ok: boolean }>("/settings", { method: "PUT", body: JSON.stringify(data) })
-};
+}
+
+export const pipelines = {
+  runs: (jobId: number) => request<any[]>(`/ai/jobs/${jobId}/pipeline`),
+  getRun: (id: number) => request<any>(`/ai/pipeline-runs/${id}`),
+  artifacts: (jobId: number) => request<{
+    schemaSpec: any | null;
+    routeSet: any | null;
+    routeSource: string | null;
+    schemaSource: string | null;
+    honoServices: any[];
+  }>(`/ai/jobs/${jobId}/artifacts`),
+  start: (jobId: number, data: { mode?: string } = {}) =>
+    request<any>(`/ai/jobs/${jobId}/pipeline`, { method: "POST", body: JSON.stringify(data) }),
+  rerun: (jobId: number, phase: "schema" | "data" | "api") =>
+    request<any>(`/ai/jobs/${jobId}/pipeline/${phase}/rerun`, { method: "POST", body: JSON.stringify({}) }),
+  editSchema: (jobId: number, prompt: string) =>
+    request<{ schemaSpec: any; schemaSource: string }>(`/ai/jobs/${jobId}/edit-schema`, { method: "POST", body: JSON.stringify({ prompt }) }),
+  editRoutes: (jobId: number, prompt: string) =>
+    request<{ routeSet: any; routeSource: string }>(`/ai/jobs/${jobId}/edit-routes`, { method: "POST", body: JSON.stringify({ prompt }) }),
+  rebuild: (jobId: number) =>
+    request<{ honoServiceId: number; port: number }>(`/ai/jobs/${jobId}/rebuild`, { method: "POST", body: JSON.stringify({}) }),
+  destroyApi: (jobId: number) =>
+    request<{ ok: boolean; services: number; datasetCleaned: boolean; diskCleaned: boolean }>(`/ai/jobs/${jobId}/api`, { method: "DELETE" }),
+  studioLaunch: (jobId: number) =>
+    request<{ url: string; port: number }>(`/ai/jobs/${jobId}/studio/launch`, { method: "POST", body: JSON.stringify({}) })
+};;
 
 // AI Parse
 export const aiParse = {

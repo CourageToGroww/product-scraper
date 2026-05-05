@@ -234,3 +234,72 @@ export function useCreateDatabase() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["databases"] })
   });
 }
+
+// Pipelines
+export function usePipelineRuns(jobId: number) {
+  return useQuery({
+    queryKey: ["pipeline-runs", jobId],
+    queryFn: () => api.pipelines.runs(jobId),
+    enabled: jobId > 0
+  });
+}
+
+export function useArtifacts(jobId: number) {
+  return useQuery({
+    queryKey: ["job-artifacts", jobId],
+    queryFn: () => api.pipelines.artifacts(jobId),
+    enabled: jobId > 0
+  });
+}
+
+export function useStartPipeline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, mode }: { jobId: number; mode?: string }) =>
+      api.pipelines.start(jobId, { mode }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["pipeline-runs", vars.jobId] });
+      qc.invalidateQueries({ queryKey: ["job-artifacts", vars.jobId] });
+    }
+  });
+}
+
+export function useEditSchema() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, prompt }: { jobId: number; prompt: string }) =>
+      api.pipelines.editSchema(jobId, prompt),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["job-artifacts", vars.jobId] });
+      qc.invalidateQueries({ queryKey: ["pipeline-runs", vars.jobId] });
+    }
+  });
+}
+
+export function useEditRoutes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, prompt }: { jobId: number; prompt: string }) =>
+      api.pipelines.editRoutes(jobId, prompt),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["job-artifacts", vars.jobId] });
+      qc.invalidateQueries({ queryKey: ["pipeline-runs", vars.jobId] });
+    }
+  });
+}
+
+export function useRebuildApi() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: number) => api.pipelines.rebuild(jobId),
+    onSuccess: (_data, jobId) => {
+      qc.invalidateQueries({ queryKey: ["job-artifacts", jobId] });
+    }
+  });
+}
+
+export function useStudioLaunch() {
+  return useMutation({
+    mutationFn: (jobId: number) => api.pipelines.studioLaunch(jobId)
+  });
+}
