@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 # ScrapeKit single-command launcher.
 #
 # Brings up:
@@ -18,8 +20,6 @@
 # or: DATABASE_URL=postgres://scrapekit:scrapekit@localhost:5434/scrapekit npm run up
 #
 # This script is invoked by `npm run up` from the workbench/ directory.
-
-set -euo pipefail
 
 NETWORK="scrapekit-net"
 MAIN_DB_CONTAINER="scrapekit-main-db"
