@@ -9,6 +9,9 @@ import { honoServices as honoServicesTable, datasets } from "../../db/schema.js"
 import { eq, desc } from "drizzle-orm";
 import { db } from "../lib/db.js";
 import { destroyJobDatabase } from "../lib/docker-manager.js";
+import { editSchemaWithAi, editRoutesWithAi, getJobArtifacts } from "../lib/ai-pipeline/edit.js";
+import { rebuildHonoServiceForJob } from "../lib/ai-pipeline/rebuild.js";
+import { launchStudioForJob } from "../lib/ai-pipeline/studio-launcher.js";
 
 const app = new Hono();
 
@@ -76,6 +79,59 @@ app.delete("/jobs/:id/api", async (c) => {
   }
 
   return c.json({ ok: true, services: services.length, datasetCleaned: !!ds, diskCleaned: true });
+});
+
+app.get("/jobs/:id/artifacts", async (c) => {
+  const jobId = Number(c.req.param("id"));
+  if (!Number.isInteger(jobId) || jobId <= 0) return c.json({ error: "Invalid job id" }, 400);
+  const result = await getJobArtifacts(jobId);
+  return c.json(result);
+});
+
+app.post("/jobs/:id/edit-schema", async (c) => {
+  const jobId = Number(c.req.param("id"));
+  const body = await c.req.json().catch(() => ({}));
+  const prompt = String(body.prompt ?? "").trim();
+  if (!prompt) return c.json({ error: "prompt is required" }, 400);
+  try {
+    const result = await editSchemaWithAi(jobId, prompt);
+    return c.json(result);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
+
+app.post("/jobs/:id/edit-routes", async (c) => {
+  const jobId = Number(c.req.param("id"));
+  const body = await c.req.json().catch(() => ({}));
+  const prompt = String(body.prompt ?? "").trim();
+  if (!prompt) return c.json({ error: "prompt is required" }, 400);
+  try {
+    const result = await editRoutesWithAi(jobId, prompt);
+    return c.json(result);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
+
+app.post("/jobs/:id/rebuild", async (c) => {
+  const jobId = Number(c.req.param("id"));
+  try {
+    const result = await rebuildHonoServiceForJob(jobId);
+    return c.json(result);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
+
+app.post("/jobs/:id/studio/launch", async (c) => {
+  const jobId = Number(c.req.param("id"));
+  try {
+    const result = await launchStudioForJob(jobId);
+    return c.json(result);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
 });
 
 export default app;
