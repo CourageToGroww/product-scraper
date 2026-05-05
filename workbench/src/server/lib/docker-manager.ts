@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import postgres from "postgres";
+import { ensureNetwork } from "./network.js";
 
 const docker = new Docker();
 
@@ -151,6 +152,8 @@ function serviceBlock(serviceName: string, containerName: string, port: number, 
       - "${port}:5432"
     volumes:
       - ${volumeSource}:/var/lib/postgresql/data
+    networks:
+      - scrapekit-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s
@@ -186,6 +189,11 @@ services:`;
 volumes:
   main-pgdata:
     name: scrapekit-main-pgdata
+
+networks:
+  scrapekit-net:
+    external: true
+    name: scrapekit-net
 `;
 
   ensureDir(REGISTRY_DIR);
@@ -260,6 +268,8 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
     throw new Error("Docker is not running. Start Docker and retry.");
   }
 
+  await ensureNetwork();
+
   const dbs = loadRegistry();
   const slug = slugify(`job-${jobId}-${jobName}`);
   const port = await findAvailablePort(dbs);
@@ -303,6 +313,8 @@ export async function createDatabase(name: string): Promise<ProjectDb> {
   if (!available) {
     throw new Error("Docker is not running. Cannot create database container.");
   }
+
+  await ensureNetwork();
 
   const dbs = loadRegistry();
   const slug = slugify(name);
@@ -530,6 +542,8 @@ export async function spawnDatasetDatabase(
   if (!available) {
     throw new Error("Docker is not running. Start Docker and retry.");
   }
+
+  await ensureNetwork();
 
   const dbs = loadRegistry();
   const slug = slugify(`dataset-${datasetId}-${datasetName}`);
