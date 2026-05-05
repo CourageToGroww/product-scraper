@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import postgres from "postgres";
 import { callLLMJson, type Provider } from "./llm-client.js";
 import { SchemaSpecSchema, type SchemaSpec, type ColumnSpec } from "./types.js";
 
@@ -94,4 +95,42 @@ export function persistSchemaToDisk(jobId: number, spec: SchemaSpec, jobsDir: st
   const filePath = path.join(dir, "schema.ts");
   fs.writeFileSync(filePath, source, "utf-8");
   return { filePath, schemaSpec: spec, source };
+}
+
+// Apply schema to job DB via raw SQL DDL
+
+export async function applySchemaToJobDb(connectionUrl: string, spec: SchemaSpec): Promise<void> {
+  const sql = postgres(connectionUrl, { max: 1 });
+  try {
+    for (const table of spec.tables) {
+      const colDefs = table.columns
+        .filter(c => c.name !== "id")
+        .map(c => {
+          const safeName = c.name.replace(/[^a-zA-Z0-9_]/g, "_").substring(0, 63);
+          return `"${safeName}" ${pgTypeFor(c.type)}${c.nullable ? "" : " NOT NULL"}`;
+        })
+        .join(",\n        ");
+
+      const safeTable = table.name.replace(/[^a-zA-Z0-9_]/g, "_").substring(0, 63);
+      const ddl = `
+        CREATE TABLE IF NOT EXISTS "${safeTable}" (
+          id SERIAL PRIMARY KEY${colDefs ? ",\n        " + colDefs : ""}
+        )`;
+      await sql.unsafe(ddl);
+    }
+  } finally {
+    await sql.end();
+  }
+}
+
+function pgTypeFor(t: string): string {
+  switch (t) {
+    case "text": return "TEXT";
+    case "integer": return "INTEGER";
+    case "real": return "REAL";
+    case "boolean": return "BOOLEAN";
+    case "timestamp": return "TIMESTAMP";
+    case "jsonb": return "JSONB";
+    default: throw new Error(`Unknown column type: ${t}`);
+  }
 }
