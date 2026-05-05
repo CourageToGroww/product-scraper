@@ -30,7 +30,7 @@ const PROVIDERS: Record<Provider, ProviderConfig> = {
   },
   deepseek: {
     url: "https://api.deepseek.com/v1/chat/completions",
-    model: "deepseek-chat"
+    model: "deepseek-v4-pro"
   },
   kimi: {
     url: "https://api.moonshot.cn/v1/chat/completions",
