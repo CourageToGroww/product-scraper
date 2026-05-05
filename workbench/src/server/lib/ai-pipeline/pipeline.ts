@@ -7,6 +7,7 @@ import { generateSchema, persistSchemaToDisk, applySchemaToJobDb, renderDrizzleS
 import { runDataTransform } from "./data-transform.js";
 import { generateCrudRoutes, renderRouteFile, persistRoutesToDisk } from "./route-gen.js";
 import { buildAndSpawnHonoService } from "./hono-builder.js";
+import { destroyJobDatabase } from "../docker-manager.js";
 import { getAiSettings, type Provider, PROVIDERS } from "./llm-client.js";
 import type { ParseMode } from "../ai-parser.js";
 import type { PipelineRun, SchemaSpec, RouteSet } from "./types.js";
@@ -95,6 +96,9 @@ export async function runPipeline(jobId: number, opts: { mode?: ParseMode } = {}
     result.schemaPipelineId = schemaRun.id;
   } catch (err) {
     await failPipelineRun(schemaRun.id, err instanceof Error ? err.message : String(err));
+    if (datasetRow.databaseContainerId) {
+      await destroyJobDatabase(datasetRow.databaseContainerId).catch(() => { /* ignore secondary failure */ });
+    }
     throw err;
   }
 
@@ -114,6 +118,9 @@ export async function runPipeline(jobId: number, opts: { mode?: ParseMode } = {}
     result.apiPipelineId = apiRun.id;
   } catch (err) {
     await failPipelineRun(apiRun.id, err instanceof Error ? err.message : String(err));
+    if (datasetRow.databaseContainerId) {
+      await destroyJobDatabase(datasetRow.databaseContainerId).catch(() => { /* ignore secondary failure */ });
+    }
     throw err;
   }
 
