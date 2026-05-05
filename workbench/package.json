@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "start": "node dist/server/index.js",
+    "up": "bash start.sh",
     "start:all": "bash start.sh",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
