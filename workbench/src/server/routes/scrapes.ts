@@ -11,6 +11,8 @@ import { datasets, datasetRows } from "../../db/schema.js";
 import { dashboards, charts } from "../../db/schema.js";
 import { destroyJobDatabase, loadRegistry, saveRegistry, regenerateComposeFile } from "../lib/docker-manager.js";
 import { discoverUrls } from "../lib/url-discovery.js";
+import { getAiSettings } from "../lib/ai-pipeline/llm-client.js";
+import { runPipeline } from "../lib/ai-pipeline/pipeline.js";
 
 const app = new Hono<Env>();
 
@@ -115,6 +117,13 @@ app.post("/", async (c) => {
       headers: Object.keys(mergedHeaders).length > 0 ? mergedHeaders : undefined,
       delay: body.delay || body.options.delay,
       timeout: body.timeout || body.options.timeout
+    }).then(async () => {
+      const aiSettings = await getAiSettings();
+      if (aiSettings?.autoparse) {
+        runPipeline(job.id).catch((err) => {
+          console.error(`[pipeline] failure for job ${job.id}:`, err);
+        });
+      }
     }).catch(async (err) => {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[api-scrape:${job.id}] Unhandled error: ${message}`);
@@ -147,6 +156,13 @@ app.post("/", async (c) => {
     options,
     scrapeOpts: body.scrapeOpts,
     extractionConfig: body.extractionConfig
+  }).then(async () => {
+    const aiSettings = await getAiSettings();
+    if (aiSettings?.autoparse) {
+      runPipeline(job.id).catch((err) => {
+        console.error(`[pipeline] failure for job ${job.id}:`, err);
+      });
+    }
   }).catch(async (err) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[scrape:${job.id}] Unhandled error: ${message}`);
