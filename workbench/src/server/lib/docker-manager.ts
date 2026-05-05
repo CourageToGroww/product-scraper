@@ -488,7 +488,8 @@ export async function destroyJobDatabase(containerId: string): Promise<void> {
     // Remove from registry and regenerate compose (service disappears from file)
     dbs.splice(idx, 1);
     saveRegistry(dbs);
-    await updateContainerStatus(entry.id, "destroyed");
+    // Always mark destroyed even if Docker cleanup partially failed; operator can manually verify.
+    await updateContainerStatus(entry.id, "destroyed").catch(() => { /* ignore secondary */ });
     regenerateComposeFile();
 
     // Clean data directory (Docker creates files as root/postgres UID, so use
