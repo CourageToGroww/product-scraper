@@ -98,3 +98,59 @@ export const settings = pgTable("settings", {
   kimiApiKey: text("kimi_api_key"),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });
+
+export const containers = pgTable("containers", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  type: text("type", { enum: ["job-db", "job-api", "dataset-db", "standalone", "merge-target", "main-db"] }).notNull(),
+  jobId: integer("job_id").references(() => scrapeJobs.id, { onDelete: "set null" }),
+  datasetId: integer("dataset_id").references(() => datasets.id, { onDelete: "set null" }),
+  containerId: text("container_id"),
+  port: integer("port").notNull(),
+  status: text("status", { enum: ["creating", "running", "stopped", "error", "destroyed"] }).notNull().default("creating"),
+  password: text("password").notNull(),
+  dbUser: text("db_user").notNull().default("scrapekit"),
+  dbName: text("db_name").notNull().default("scrapekit"),
+  dataPath: text("data_path"),
+  network: text("network").notNull().default("scrapekit-net"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  destroyedAt: timestamp("destroyed_at")
+}, (table) => [
+  index("containers_type_idx").on(table.type),
+  index("containers_status_idx").on(table.status),
+  index("containers_job_idx").on(table.jobId),
+  index("containers_dataset_idx").on(table.datasetId)
+]);
+
+export const aiPipelines = pgTable("ai_pipelines", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").references(() => scrapeJobs.id, { onDelete: "cascade" }),
+  phase: text("phase", { enum: ["schema", "data", "api"] }).notNull(),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  status: text("status", { enum: ["pending", "running", "completed", "failed"] }).notNull().default("pending"),
+  inputSummary: jsonb("input_summary").$type<Record<string, unknown>>(),
+  output: jsonb("output").$type<Record<string, unknown>>(),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+}, (table) => [
+  index("ai_pipelines_job_idx").on(table.jobId),
+  index("ai_pipelines_status_idx").on(table.status)
+]);
+
+export const honoServices = pgTable("hono_services", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").references(() => scrapeJobs.id, { onDelete: "cascade" }),
+  containerRef: integer("container_ref").references(() => containers.id, { onDelete: "set null" }),
+  srcDir: text("src_dir").notNull(),
+  imageTag: text("image_tag"),
+  port: integer("port").notNull(),
+  status: text("status", { enum: ["scaffolded", "building", "running", "stopped", "error"] }).notNull().default("scaffolded"),
+  routesGenerated: integer("routes_generated").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+}, (table) => [
+  index("hono_services_job_idx").on(table.jobId)
+]);
