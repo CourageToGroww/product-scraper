@@ -63,7 +63,8 @@ export async function buildAndSpawnHonoService(input: HonoBuildInput): Promise<H
   try {
     await execAsync(
       `docker run -d --name ${containerName} --network scrapekit-net ` +
-        `-p ${port}:3001 -e DATABASE_URL=${JSON.stringify(input.jobDbConnectionUrl)} ${imageTag}`
+      `--add-host=host.docker.internal:host-gateway ` +
+      `-p ${port}:3001 -e DATABASE_URL=${JSON.stringify(input.jobDbConnectionUrl)} ${imageTag}`
     );
     const psResult = await execAsync(`docker ps -q -f name=^${containerName}$`);
     containerId = psResult.stdout.trim();
