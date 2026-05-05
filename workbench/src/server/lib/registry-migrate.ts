@@ -31,7 +31,10 @@ export async function migrateRegistryIfNeeded(): Promise<{ migrated: number; ski
   let entries: LegacyEntry[];
   try {
     entries = JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.warn(
+      `Registry migration: failed to parse ${REGISTRY_FILE} (${err instanceof Error ? err.message : "unknown error"}); skipping migration. Inspect the file manually if you expected data to migrate.`
+    );
     fs.writeFileSync(MIGRATED_MARKER, new Date().toISOString());
     return { migrated: 0, skipped: true };
   }
