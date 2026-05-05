@@ -312,21 +312,26 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
   });
 
   // Regenerate compose file with new service, then start it
-  regenerateComposeFile();
-  compose("up", "-d", "--quiet-pull", slug);
+  try {
+    regenerateComposeFile();
+    compose("up", "-d", "--quiet-pull", slug);
 
-  // Get the container ID
-  const containerId = compose("ps", "-q", slug).trim();
-  entry.containerId = containerId;
-  saveRegistry(dbs);
+    // Get the container ID
+    const containerId = compose("ps", "-q", slug).trim();
+    entry.containerId = containerId;
+    saveRegistry(dbs);
 
-  await updateContainerId(slug, containerId);
-  await updateContainerStatus(slug, "running");
+    await updateContainerId(slug, containerId);
+    await updateContainerStatus(slug, "running");
 
-  await waitForPostgres(port);
-  await pushResultsSchema(port);
+    await waitForPostgres(port);
+    await pushResultsSchema(port);
+  } catch (err) {
+    await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
+    throw err;
+  }
 
-  return { containerId, port, slug };
+  return { containerId: entry.containerId, port, slug };
 }
 
 // --- Manual database creation (for databases route) ---
@@ -370,15 +375,20 @@ export async function createDatabase(name: string): Promise<ProjectDb> {
     dataPath
   });
 
-  regenerateComposeFile();
-  compose("up", "-d", "--quiet-pull", slug);
+  try {
+    regenerateComposeFile();
+    compose("up", "-d", "--quiet-pull", slug);
 
-  const containerId = compose("ps", "-q", slug).trim();
-  entry.containerId = containerId;
-  saveRegistry(dbs);
+    const containerId = compose("ps", "-q", slug).trim();
+    entry.containerId = containerId;
+    saveRegistry(dbs);
 
-  await updateContainerId(slug, containerId);
-  await updateContainerStatus(slug, "running");
+    await updateContainerId(slug, containerId);
+    await updateContainerStatus(slug, "running");
+  } catch (err) {
+    await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
+    throw err;
+  }
 
   return entry;
 }
@@ -616,21 +626,26 @@ export async function spawnDatasetDatabase(
     dataPath
   });
 
-  regenerateComposeFile();
-  compose("up", "-d", "--quiet-pull", slug);
+  try {
+    regenerateComposeFile();
+    compose("up", "-d", "--quiet-pull", slug);
 
-  const containerId = compose("ps", "-q", slug).trim();
-  entry.containerId = containerId;
-  saveRegistry(dbs);
+    const containerId = compose("ps", "-q", slug).trim();
+    entry.containerId = containerId;
+    saveRegistry(dbs);
 
-  await updateContainerId(slug, containerId);
-  await updateContainerStatus(slug, "running");
+    await updateContainerId(slug, containerId);
+    await updateContainerStatus(slug, "running");
 
-  await waitForPostgres(port);
-  await pushDatasetSchema(port, schemaColumns);
-  await pushDatasetRows(port, rows, schemaColumns);
+    await waitForPostgres(port);
+    await pushDatasetSchema(port, schemaColumns);
+    await pushDatasetRows(port, rows, schemaColumns);
+  } catch (err) {
+    await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
+    throw err;
+  }
 
-  return { containerId, port, slug };
+  return { containerId: entry.containerId, port, slug };
 }
 
 /**
