@@ -5,6 +5,14 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import postgres from "postgres";
+import { ensureNetwork } from "./network.js";
+import {
+  insertContainer,
+  updateContainerId,
+  updateContainerStatus,
+  listUsedPorts
+} from "./container-store.js";
+import crypto from "node:crypto";
 
 const docker = new Docker();
 
@@ -95,7 +103,8 @@ export function isPortAvailable(port: number): Promise<boolean> {
 
 export async function findAvailablePort(dbs: ProjectDb[]): Promise<number> {
   const config = loadConfig();
-  const usedPorts = new Set([...dbs.map(d => d.port), config.mainDbPort]);
+  const fromDb = await listUsedPorts();
+  const usedPorts = new Set([...dbs.map(d => d.port), ...fromDb, config.mainDbPort]);
   let port = BASE_PORT;
   while (usedPorts.has(port) || !(await isPortAvailable(port))) {
     port++;
@@ -151,6 +160,8 @@ function serviceBlock(serviceName: string, containerName: string, port: number, 
       - "${port}:5432"
     volumes:
       - ${volumeSource}:/var/lib/postgresql/data
+    networks:
+      - scrapekit-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s
@@ -186,6 +197,11 @@ services:`;
 volumes:
   main-pgdata:
     name: scrapekit-main-pgdata
+
+networks:
+  scrapekit-net:
+    external: true
+    name: scrapekit-net
 `;
 
   ensureDir(REGISTRY_DIR);
@@ -260,6 +276,8 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
     throw new Error("Docker is not running. Start Docker and retry.");
   }
 
+  await ensureNetwork();
+
   const dbs = loadRegistry();
   const slug = slugify(`job-${jobId}-${jobName}`);
   const port = await findAvailablePort(dbs);
@@ -281,19 +299,39 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
   dbs.push(entry);
   saveRegistry(dbs);
 
+  const password = crypto.randomBytes(16).toString("base64url");
+  await insertContainer({
+    slug,
+    name: entry.name,
+    type: "job-db",
+    port,
+    password,
+    jobId,
+    datasetId: null,
+    dataPath
+  });
+
   // Regenerate compose file with new service, then start it
-  regenerateComposeFile();
-  compose("up", "-d", "--quiet-pull", slug);
+  try {
+    regenerateComposeFile();
+    compose("up", "-d", "--quiet-pull", slug);
 
-  // Get the container ID
-  const containerId = compose("ps", "-q", slug).trim();
-  entry.containerId = containerId;
-  saveRegistry(dbs);
+    // Get the container ID
+    const containerId = compose("ps", "-q", slug).trim();
+    entry.containerId = containerId;
+    saveRegistry(dbs);
 
-  await waitForPostgres(port);
-  await pushResultsSchema(port);
+    await updateContainerId(slug, containerId);
+    await updateContainerStatus(slug, "running");
 
-  return { containerId, port, slug };
+    await waitForPostgres(port);
+    await pushResultsSchema(port);
+  } catch (err) {
+    await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
+    throw err;
+  }
+
+  return { containerId: entry.containerId, port, slug };
 }
 
 // --- Manual database creation (for databases route) ---
@@ -303,6 +341,8 @@ export async function createDatabase(name: string): Promise<ProjectDb> {
   if (!available) {
     throw new Error("Docker is not running. Cannot create database container.");
   }
+
+  await ensureNetwork();
 
   const dbs = loadRegistry();
   const slug = slugify(name);
@@ -323,12 +363,32 @@ export async function createDatabase(name: string): Promise<ProjectDb> {
   dbs.push(entry);
   saveRegistry(dbs);
 
-  regenerateComposeFile();
-  compose("up", "-d", "--quiet-pull", slug);
+  const password = crypto.randomBytes(16).toString("base64url");
+  await insertContainer({
+    slug,
+    name,
+    type: "standalone",
+    port,
+    password,
+    jobId: null,
+    datasetId: null,
+    dataPath
+  });
 
-  const containerId = compose("ps", "-q", slug).trim();
-  entry.containerId = containerId;
-  saveRegistry(dbs);
+  try {
+    regenerateComposeFile();
+    compose("up", "-d", "--quiet-pull", slug);
+
+    const containerId = compose("ps", "-q", slug).trim();
+    entry.containerId = containerId;
+    saveRegistry(dbs);
+
+    await updateContainerId(slug, containerId);
+    await updateContainerStatus(slug, "running");
+  } catch (err) {
+    await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
+    throw err;
+  }
 
   return entry;
 }
@@ -418,6 +478,7 @@ export async function destroyJobDatabase(containerId: string): Promise<void> {
     // Remove from registry and regenerate compose (service disappears from file)
     dbs.splice(idx, 1);
     saveRegistry(dbs);
+    await updateContainerStatus(entry.id, "destroyed");
     regenerateComposeFile();
 
     // Clean data directory (Docker creates files as root/postgres UID, so use
@@ -531,6 +592,8 @@ export async function spawnDatasetDatabase(
     throw new Error("Docker is not running. Start Docker and retry.");
   }
 
+  await ensureNetwork();
+
   const dbs = loadRegistry();
   const slug = slugify(`dataset-${datasetId}-${datasetName}`);
   const port = await findAvailablePort(dbs);
@@ -551,18 +614,38 @@ export async function spawnDatasetDatabase(
   dbs.push(entry);
   saveRegistry(dbs);
 
-  regenerateComposeFile();
-  compose("up", "-d", "--quiet-pull", slug);
+  const password = crypto.randomBytes(16).toString("base64url");
+  await insertContainer({
+    slug,
+    name: entry.name,
+    type: "dataset-db",
+    port,
+    password,
+    jobId: null,
+    datasetId,
+    dataPath
+  });
 
-  const containerId = compose("ps", "-q", slug).trim();
-  entry.containerId = containerId;
-  saveRegistry(dbs);
+  try {
+    regenerateComposeFile();
+    compose("up", "-d", "--quiet-pull", slug);
 
-  await waitForPostgres(port);
-  await pushDatasetSchema(port, schemaColumns);
-  await pushDatasetRows(port, rows, schemaColumns);
+    const containerId = compose("ps", "-q", slug).trim();
+    entry.containerId = containerId;
+    saveRegistry(dbs);
 
-  return { containerId, port, slug };
+    await updateContainerId(slug, containerId);
+    await updateContainerStatus(slug, "running");
+
+    await waitForPostgres(port);
+    await pushDatasetSchema(port, schemaColumns);
+    await pushDatasetRows(port, rows, schemaColumns);
+  } catch (err) {
+    await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
+    throw err;
+  }
+
+  return { containerId: entry.containerId, port, slug };
 }
 
 /**

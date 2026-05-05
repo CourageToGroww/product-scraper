@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17-alpine
+    container_name: scrapekit-main-db
     environment:
       POSTGRES_USER: scrapekit
       POSTGRES_PASSWORD: scrapekit
@@ -9,6 +10,8 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - scrapekit-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U scrapekit"]
       interval: 5s
@@ -19,12 +22,15 @@ services:
     build:
       context: .
       dockerfile: workbench/Dockerfile
+    container_name: scrapekit-workbench
     ports:
       - "3000:3000"
     environment:
       DATABASE_URL: postgres://scrapekit:scrapekit@postgres:5432/scrapekit
       PORT: "3000"
       NODE_ENV: production
+    networks:
+      - scrapekit-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,14 +39,22 @@ services:
     build:
       context: .
       dockerfile: workbench/Dockerfile
+    container_name: scrapekit-studio
     ports:
       - "4983:4983"
     environment:
       DATABASE_URL: postgres://scrapekit:scrapekit@postgres:5432/scrapekit
     command: npx drizzle-kit studio --port 4983 --host 0.0.0.0
+    networks:
+      - scrapekit-net
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   pgdata:
+
+networks:
+  scrapekit-net:
+    external: true
+    name: scrapekit-net
