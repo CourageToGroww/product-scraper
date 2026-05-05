@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 *.env.local
+
+# AI pipeline generated artifacts (per-job schema, routes, service src)
+jobs/*/
+!jobs/.gitkeep

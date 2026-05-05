@@ -5,7 +5,7 @@ import { spawnDatasetDatabase } from "./docker-manager.js";
 
 // ── Provider Configuration ──────────────────────────────────────────
 
-type Provider = "claude" | "openai" | "gemini" | "deepseek" | "kimi";
+export type Provider = "claude" | "openai" | "gemini" | "deepseek" | "kimi";
 
 interface ProviderConfig {
   url: string;
@@ -14,7 +14,7 @@ interface ProviderConfig {
   isClaude?: boolean;
 }
 
-const PROVIDERS: Record<Provider, ProviderConfig> = {
+export const PROVIDERS: Record<Provider, ProviderConfig> = {
   claude: {
     url: "https://api.anthropic.com/v1/messages",
     model: "claude-sonnet-4-5-20250514",
@@ -211,7 +211,7 @@ Rules:
 
 // ── LLM Call ────────────────────────────────────────────────────────
 
-async function callLLM(
+export async function callLLM(
   provider: Provider,
   apiKey: string,
   systemPrompt: string,
