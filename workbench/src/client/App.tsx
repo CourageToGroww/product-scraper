@@ -12,6 +12,7 @@ import DashboardEditPage from "./pages/DashboardEditPage";
 import DatabasesPage from "./pages/DatabasesPage";
 import DatasetBuilderPage from "./pages/DatasetBuilderPage";
 import SettingsPage from "./pages/SettingsPage";
+import JobApiPage from "./pages/JobApiPage";
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/scrapes" element={<ScrapeListPage />} />
           <Route path="/scrapes/new" element={<ScrapeNewPage />} />
           <Route path="/scrapes/:id" element={<ScrapeDetailPage />} />
+          <Route path="/scrapes/:id/api" element={<JobApiPage />} />
           <Route path="/scrapes/:id/build" element={<DatasetBuilderPage />} />
           <Route path="/datasets" element={<DatasetListPage />} />
           <Route path="/datasets/:id" element={<DatasetViewPage />} />
