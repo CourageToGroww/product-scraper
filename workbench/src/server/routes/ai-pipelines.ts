@@ -1,11 +1,14 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Hono } from "hono";
 import { z } from "zod";
 import { runPipeline, rerunPhase } from "../lib/ai-pipeline/pipeline.js";
 import { listPipelineRunsForJob, getPipelineRun } from "../lib/ai-pipeline/store.js";
 import { destroyHonoService } from "../lib/ai-pipeline/hono-builder.js";
-import { honoServices as honoServicesTable } from "../../db/schema.js";
-import { eq } from "drizzle-orm";
+import { honoServices as honoServicesTable, datasets } from "../../db/schema.js";
+import { eq, desc } from "drizzle-orm";
 import { db } from "../lib/db.js";
+import { destroyJobDatabase } from "../lib/docker-manager.js";
 
 const app = new Hono();
 
@@ -56,7 +59,23 @@ app.delete("/jobs/:id/api", async (c) => {
 
   const services = await db.select().from(honoServicesTable).where(eq(honoServicesTable.jobId, jobId));
   for (const s of services) await destroyHonoService(s.id);
-  return c.json({ ok: true, count: services.length });
+
+  // Destroy latest dataset DB for this job
+  const [ds] = await db.select().from(datasets)
+    .where(eq(datasets.sourceJobId, jobId))
+    .orderBy(desc(datasets.id))
+    .limit(1);
+  if (ds?.databaseContainerId) {
+    await destroyJobDatabase(ds.databaseContainerId).catch(() => { /* ignore */ });
+  }
+
+  // Remove on-disk artifacts
+  const jobDir = path.join(process.cwd(), "jobs", String(jobId));
+  if (fs.existsSync(jobDir)) {
+    fs.rmSync(jobDir, { recursive: true, force: true });
+  }
+
+  return c.json({ ok: true, services: services.length, datasetCleaned: !!ds, diskCleaned: true });
 });
 
 export default app;

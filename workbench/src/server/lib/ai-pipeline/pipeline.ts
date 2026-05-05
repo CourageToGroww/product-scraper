@@ -1,12 +1,13 @@
 import path from "node:path";
 import { db } from "../db.js";
-import { datasets, scrapeJobs, datasetRows, containers } from "../../../db/schema.js";
-import { eq, desc } from "drizzle-orm";
+import { datasets, scrapeJobs, datasetRows, containers, aiPipelines } from "../../../db/schema.js";
+import { eq, desc, and } from "drizzle-orm";
 import { startPipelineRun, completePipelineRun, failPipelineRun } from "./store.js";
 import { generateSchema, persistSchemaToDisk, applySchemaToJobDb, renderDrizzleSchema } from "./schema-gen.js";
 import { runDataTransform } from "./data-transform.js";
 import { generateCrudRoutes, renderRouteFile, persistRoutesToDisk } from "./route-gen.js";
 import { buildAndSpawnHonoService } from "./hono-builder.js";
+import { destroyJobDatabase } from "../docker-manager.js";
 import { getAiSettings, type Provider, PROVIDERS } from "./llm-client.js";
 import type { ParseMode } from "../ai-parser.js";
 import type { PipelineRun, SchemaSpec, RouteSet } from "./types.js";
@@ -95,6 +96,9 @@ export async function runPipeline(jobId: number, opts: { mode?: ParseMode } = {}
     result.schemaPipelineId = schemaRun.id;
   } catch (err) {
     await failPipelineRun(schemaRun.id, err instanceof Error ? err.message : String(err));
+    if (datasetRow.databaseContainerId) {
+      await destroyJobDatabase(datasetRow.databaseContainerId).catch(() => { /* ignore secondary failure */ });
+    }
     throw err;
   }
 
@@ -114,6 +118,9 @@ export async function runPipeline(jobId: number, opts: { mode?: ParseMode } = {}
     result.apiPipelineId = apiRun.id;
   } catch (err) {
     await failPipelineRun(apiRun.id, err instanceof Error ? err.message : String(err));
+    if (datasetRow.databaseContainerId) {
+      await destroyJobDatabase(datasetRow.databaseContainerId).catch(() => { /* ignore secondary failure */ });
+    }
     throw err;
   }
 
@@ -159,7 +166,85 @@ async function waitForDatasetDb(
   return null;
 }
 
-export async function rerunPhase(jobId: number, _phase: "schema" | "data" | "api"): Promise<void> {
-  // For now, rerun the entire pipeline. Selective re-run is a Plan 3 enhancement.
-  await runPipeline(jobId);
+export async function rerunPhase(jobId: number, phase: "schema" | "data" | "api"): Promise<void> {
+  // Selective re-run. Each phase can be re-run only if its prerequisites still exist.
+  if (phase === "data") {
+    // Re-run data forces re-running schema and api too (they depend on dataset rows)
+    await runPipeline(jobId);
+    return;
+  }
+
+  // For 'schema' or 'api' rerun, find the latest dataset for this job; reuse its DB.
+  const settings = await getAiSettings();
+  if (!settings) throw new Error("No AI provider configured. Set one in Settings.");
+  const provider = settings.provider as Provider;
+  const apiKey = settings.apiKey;
+  const model = PROVIDERS[provider].model;
+
+  const [latestDataset] = await db.select().from(datasets)
+    .where(eq(datasets.sourceJobId, jobId))
+    .orderBy(desc(datasets.id))
+    .limit(1);
+  if (!latestDataset) throw new Error(`No dataset found for job ${jobId}; run the data phase first`);
+
+  const datasetRow = await waitForDatasetDb(latestDataset.id, 30000);
+  if (!datasetRow) throw new Error(`Dataset DB for ${latestDataset.id} not ready`);
+  const creds = await getDatasetDbCredentials(latestDataset.id);
+  if (!creds) throw new Error(`No container credentials for dataset ${latestDataset.id}`);
+
+  if (phase === "schema") {
+    const schemaRun = await startPipelineRun({
+      jobId, phase: "schema", provider, model, inputSummary: { datasetId: latestDataset.id, rerun: true }
+    });
+    try {
+      const sample = await db.select({ data: datasetRows.data })
+        .from(datasetRows)
+        .where(eq(datasetRows.datasetId, latestDataset.id))
+        .orderBy(datasetRows.rowIndex)
+        .limit(20)
+        .then(rows => rows.map(r => r.data as Record<string, unknown>));
+      const [job] = await db.select().from(scrapeJobs).where(eq(scrapeJobs.id, jobId)).limit(1);
+      const suggested = job?.name?.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || `job_${jobId}`;
+      const schemaSpec = await generateSchema({ jobId, provider, apiKey, model, sampleRows: sample, suggestedTableName: suggested });
+      persistSchemaToDisk(jobId, schemaSpec, JOBS_DIR);
+      if (datasetRow.databasePort) {
+        const url = `postgres://${creds.user}:${encodeURIComponent(creds.password)}@localhost:${datasetRow.databasePort}/${creds.dbName}`;
+        await applySchemaToJobDb(url, schemaSpec);
+      }
+      await completePipelineRun(schemaRun.id, { output: { schemaSpec } });
+    } catch (err) {
+      await failPipelineRun(schemaRun.id, err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    return;
+  }
+
+  if (phase === "api") {
+    // Need the latest schema spec (from completed schema-phase run for this job).
+    const [latestSchemaRun] = await db.select().from(aiPipelines)
+      .where(and(eq(aiPipelines.jobId, jobId), eq(aiPipelines.phase, "schema"), eq(aiPipelines.status, "completed")))
+      .orderBy(desc(aiPipelines.id))
+      .limit(1);
+    if (!latestSchemaRun || !latestSchemaRun.output) {
+      throw new Error("No completed schema run found; run the schema phase first");
+    }
+    const schemaSpec = (latestSchemaRun.output as { schemaSpec: SchemaSpec }).schemaSpec;
+    if (!schemaSpec) throw new Error("Schema run output missing schemaSpec");
+
+    const apiRun = await startPipelineRun({
+      jobId, phase: "api", provider, model, inputSummary: { tables: schemaSpec.tables.map(t => t.name), rerun: true }
+    });
+    try {
+      const routeSet = await generateCrudRoutes({ provider, apiKey, model, schemaSpec });
+      const routeSource = renderRouteFile(routeSet, schemaSpec);
+      persistRoutesToDisk(jobId, routeSet.resource, routeSource, JOBS_DIR);
+      await completePipelineRun(apiRun.id, { output: { routeSet } });
+    } catch (err) {
+      await failPipelineRun(apiRun.id, err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    return;
+  }
+
+  throw new Error(`Unknown phase: ${phase}`);
 }
