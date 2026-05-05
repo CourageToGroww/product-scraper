@@ -2,6 +2,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { runPipeline, rerunPhase } from "../lib/ai-pipeline/pipeline.js";
 import { listPipelineRunsForJob, getPipelineRun } from "../lib/ai-pipeline/store.js";
+import { destroyHonoService } from "../lib/ai-pipeline/hono-builder.js";
+import { honoServices as honoServicesTable } from "../../db/schema.js";
+import { eq } from "drizzle-orm";
+import { db } from "../lib/db.js";
 
 const app = new Hono();
 
@@ -44,6 +48,15 @@ app.get("/pipeline-runs/:id", async (c) => {
   const run = await getPipelineRun(id);
   if (!run) return c.json({ error: "Not found" }, 404);
   return c.json(run);
+});
+
+app.delete("/jobs/:id/api", async (c) => {
+  const jobId = Number(c.req.param("id"));
+  if (!Number.isInteger(jobId) || jobId <= 0) return c.json({ error: "Invalid job id" }, 400);
+
+  const services = await db.select().from(honoServicesTable).where(eq(honoServicesTable.jobId, jobId));
+  for (const s of services) await destroyHonoService(s.id);
+  return c.json({ ok: true, count: services.length });
 });
 
 export default app;

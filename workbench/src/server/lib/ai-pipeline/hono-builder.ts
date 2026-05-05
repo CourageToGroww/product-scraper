@@ -128,3 +128,17 @@ function countRouteFiles(jobDir: string): number {
   if (!fs.existsSync(dir)) return 0;
   return fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && f !== ".gitkeep").length;
 }
+
+export async function destroyHonoService(honoServiceId: number): Promise<void> {
+  const [row] = await db.select().from(honoServices).where(eq(honoServices.id, honoServiceId)).limit(1);
+  if (!row) return;
+
+  const apiSlug = `job-${row.jobId}-api`;
+  const containerName = `scrapekit-${apiSlug}`;
+
+  try { execSync(`docker rm -f ${containerName}`, { stdio: "pipe" }); } catch { /* ignore */ }
+  try { execSync(`docker rmi ${row.imageTag}`, { stdio: "pipe" }); } catch { /* ignore */ }
+
+  await db.update(honoServices).set({ status: "stopped" }).where(eq(honoServices.id, honoServiceId));
+  await updateContainerStatus(apiSlug, "destroyed").catch(() => { /* ignore */ });
+}
