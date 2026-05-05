@@ -1,6 +1,6 @@
 import { db } from "../db.js";
 import { aiPipelines } from "../../../db/schema.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import type { Phase } from "./types.js";
 
 export interface StartRunInput {
@@ -55,7 +55,6 @@ export async function listPipelineRunsForJob(jobId: number) {
 
 export async function listPipelineRunsForJobAndPhase(jobId: number, phase: Phase) {
   return db.select().from(aiPipelines)
-    .where(eq(aiPipelines.jobId, jobId))
-    .orderBy(desc(aiPipelines.id))
-    .then(rows => rows.filter(r => r.phase === phase));
+    .where(and(eq(aiPipelines.jobId, jobId), eq(aiPipelines.phase, phase)))
+    .orderBy(desc(aiPipelines.id));
 }
