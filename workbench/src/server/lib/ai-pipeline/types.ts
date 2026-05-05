@@ -53,7 +53,7 @@ export const RouteSpecSchema = z.object({
 export type RouteSpec = z.infer<typeof RouteSpecSchema>;
 
 export const RouteSetSchema = z.object({
-  resource: z.string().regex(/^[a-z][a-z0-9_]*/),
+  resource: z.string().regex(/^[a-z][a-z0-9_]*$/),
   routes: z.array(RouteSpecSchema).min(1)
 });
 export type RouteSet = z.infer<typeof RouteSetSchema>;

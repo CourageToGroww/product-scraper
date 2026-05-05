@@ -1,7 +1,7 @@
 import path from "node:path";
 import { db } from "../db.js";
-import { datasets, scrapeJobs, datasetRows } from "../../../db/schema.js";
-import { eq } from "drizzle-orm";
+import { datasets, scrapeJobs, datasetRows, containers } from "../../../db/schema.js";
+import { eq, desc } from "drizzle-orm";
 import { startPipelineRun, completePipelineRun, failPipelineRun } from "./store.js";
 import { generateSchema, persistSchemaToDisk, applySchemaToJobDb, renderDrizzleSchema } from "./schema-gen.js";
 import { runDataTransform } from "./data-transform.js";
@@ -12,6 +12,19 @@ import type { ParseMode } from "../ai-parser.js";
 import type { PipelineRun, SchemaSpec, RouteSet } from "./types.js";
 
 const JOBS_DIR = path.join(process.cwd(), "jobs");
+
+async function getDatasetDbCredentials(datasetId: number): Promise<{ password: string; user: string; dbName: string } | null> {
+  const [row] = await db.select({
+    password: containers.password,
+    user: containers.dbUser,
+    dbName: containers.dbName
+  })
+    .from(containers)
+    .where(eq(containers.datasetId, datasetId))
+    .orderBy(desc(containers.id))
+    .limit(1);
+  return row ?? null;
+}
 
 export async function runPipeline(jobId: number, opts: { mode?: ParseMode } = {}): Promise<PipelineRun> {
   const settings = await getAiSettings();
@@ -73,7 +86,9 @@ export async function runPipeline(jobId: number, opts: { mode?: ParseMode } = {}
     persistSchemaToDisk(jobId, schemaSpec, JOBS_DIR);
 
     if (datasetRow.databasePort) {
-      const url = `postgres://scrapekit:scrapekit@localhost:${datasetRow.databasePort}/scrapekit`;
+      const creds = await getDatasetDbCredentials(dataResult.datasetId);
+      if (!creds) throw new Error(`No container row found for dataset ${dataResult.datasetId}`);
+      const url = `postgres://${creds.user}:${encodeURIComponent(creds.password)}@localhost:${datasetRow.databasePort}/${creds.dbName}`;
       await applySchemaToJobDb(url, schemaSpec);
     }
     await completePipelineRun(schemaRun.id, { output: { schemaSpec } });
@@ -109,7 +124,9 @@ export async function runPipeline(jobId: number, opts: { mode?: ParseMode } = {}
     // --add-host=host.docker.internal:host-gateway in the Hono container run args.
     // TODO(follow-up): if host.docker.internal doesn't resolve, look up container hostname
     // from the `containers` table (slug prefix: scrapekit-db-) and use scrapekit-net instead.
-    const dbUrl = `postgres://scrapekit:scrapekit@host.docker.internal:${datasetRow.databasePort}/scrapekit`;
+    const creds = await getDatasetDbCredentials(dataResult.datasetId);
+    if (!creds) throw new Error(`No container row found for dataset ${dataResult.datasetId}`);
+    const dbUrl = `postgres://${creds.user}:${encodeURIComponent(creds.password)}@host.docker.internal:${datasetRow.databasePort}/${creds.dbName}`;
     const generatedSchemaSource = renderDrizzleSchema(schemaSpec);
     const built = await buildAndSpawnHonoService({
       jobId,

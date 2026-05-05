@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
+const execAsync = promisify(exec);
 import crypto from "node:crypto";
 import { db } from "../db.js";
 import { honoServices } from "../../../db/schema.js";
@@ -39,7 +42,7 @@ export async function buildAndSpawnHonoService(input: HonoBuildInput): Promise<H
   const imageTag = `scrapekit-${slug}:latest`;
 
   // Build image via shell `docker build`
-  execSync(`docker build -t ${imageTag} ${jobDir}`, { stdio: "inherit" });
+  await execAsync(`docker build -t ${imageTag} ${jobDir}`);
 
   // Allocate a host port (range 6500-6999 for job APIs)
   const port = await findAvailableApiPort();
@@ -58,12 +61,12 @@ export async function buildAndSpawnHonoService(input: HonoBuildInput): Promise<H
 
   let containerId = "";
   try {
-    execSync(
+    await execAsync(
       `docker run -d --name ${containerName} --network scrapekit-net ` +
-        `-p ${port}:3001 -e DATABASE_URL=${JSON.stringify(input.jobDbConnectionUrl)} ${imageTag}`,
-      { stdio: "pipe" }
+        `-p ${port}:3001 -e DATABASE_URL=${JSON.stringify(input.jobDbConnectionUrl)} ${imageTag}`
     );
-    containerId = execSync(`docker ps -q -f name=^${containerName}$`).toString().trim();
+    const psResult = await execAsync(`docker ps -q -f name=^${containerName}$`);
+    containerId = psResult.stdout.trim();
     await updateContainerId(slug, containerId);
     await updateContainerStatus(slug, "running");
   } catch (err) {
@@ -136,8 +139,8 @@ export async function destroyHonoService(honoServiceId: number): Promise<void> {
   const apiSlug = `job-${row.jobId}-api`;
   const containerName = `scrapekit-${apiSlug}`;
 
-  try { execSync(`docker rm -f ${containerName}`, { stdio: "pipe" }); } catch { /* ignore */ }
-  try { execSync(`docker rmi ${row.imageTag}`, { stdio: "pipe" }); } catch { /* ignore */ }
+  try { await execAsync(`docker rm -f ${containerName}`); } catch { /* ignore */ }
+  try { await execAsync(`docker rmi ${row.imageTag}`); } catch { /* ignore */ }
 
   await db.update(honoServices).set({ status: "stopped" }).where(eq(honoServices.id, honoServiceId));
   await updateContainerStatus(apiSlug, "destroyed").catch(() => { /* ignore */ });
