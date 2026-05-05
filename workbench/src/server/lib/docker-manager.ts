@@ -38,6 +38,7 @@ export interface ProjectDb {
   status: "running" | "stopped" | "error";
   createdAt: string;
   dataPath: string;
+  password: string;
   jobId?: number;
   datasetId?: number;
 }
@@ -69,7 +70,9 @@ export function saveConfig(config: ScrapeKitConfig): void {
 export function loadRegistry(): ProjectDb[] {
   try {
     if (fs.existsSync(REGISTRY_FILE)) {
-      return JSON.parse(fs.readFileSync(REGISTRY_FILE, "utf-8"));
+      const entries: ProjectDb[] = JSON.parse(fs.readFileSync(REGISTRY_FILE, "utf-8"));
+      // Backfill password for legacy entries that predate per-spawn passwords
+      return entries.map(e => ({ ...e, password: e.password ?? DB_PASSWORD }));
     }
   } catch { /* corrupted */ }
   return [];
@@ -118,8 +121,8 @@ export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").substring(0, 60);
 }
 
-export function connectionUrl(port: number): string {
-  return `postgres://${DB_USER}:${DB_PASSWORD}@localhost:${port}/${DB_NAME}`;
+export function connectionUrl(port: number, password: string = DB_PASSWORD): string {
+  return `postgres://${DB_USER}:${encodeURIComponent(password)}@localhost:${port}/${DB_NAME}`;
 }
 
 export function getDocker(): Docker {
@@ -147,14 +150,14 @@ export async function getContainerStatus(containerId: string): Promise<"running"
 
 // --- Single compose file generation ---
 
-function serviceBlock(serviceName: string, containerName: string, port: number, volumeSource: string): string {
+function serviceBlock(serviceName: string, containerName: string, port: number, volumeSource: string, password: string): string {
   return `
   ${serviceName}:
     image: ${DB_IMAGE}
     container_name: ${containerName}
     environment:
       POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${password}
       POSTGRES_DB: ${DB_NAME}
     ports:
       - "${port}:5432"
@@ -185,11 +188,11 @@ export function regenerateComposeFile(): void {
 services:`;
 
   // Main database (named volume for persistence)
-  yaml += serviceBlock("main-db", "scrapekit-main-db", config.mainDbPort, "main-pgdata");
+  yaml += serviceBlock("main-db", "scrapekit-main-db", config.mainDbPort, "main-pgdata", DB_PASSWORD);
 
   // Per-dataset databases (bind mounts for data isolation)
   for (const entry of dbs) {
-    yaml += serviceBlock(entry.id, `${CONTAINER_PREFIX}${entry.id}`, entry.port, entry.dataPath);
+    yaml += serviceBlock(entry.id, `${CONTAINER_PREFIX}${entry.id}`, entry.port, entry.dataPath, entry.password);
   }
 
   yaml += `
@@ -217,11 +220,11 @@ function compose(...args: string[]): string {
 
 // --- Health check ---
 
-async function waitForPostgres(port: number, timeoutMs = 30000): Promise<void> {
+async function waitForPostgres(port: number, password: string, timeoutMs = 30000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const sql = postgres(connectionUrl(port), { connect_timeout: 2, max: 1 });
+      const sql = postgres(connectionUrl(port, password), { connect_timeout: 2, max: 1 });
       await sql`SELECT 1`;
       await sql.end();
       return;
@@ -234,8 +237,8 @@ async function waitForPostgres(port: number, timeoutMs = 30000): Promise<void> {
 
 // --- Schema push (raw SQL, no drizzle-kit dependency) ---
 
-async function pushResultsSchema(port: number): Promise<void> {
-  const sql = postgres(connectionUrl(port), { max: 1 });
+async function pushResultsSchema(port: number, password: string): Promise<void> {
+  const sql = postgres(connectionUrl(port, password), { max: 1 });
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS scrape_results (
@@ -285,6 +288,8 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
 
   ensureDir(dataPath);
 
+  const password = crypto.randomBytes(16).toString("base64url");
+
   // Add to registry first
   const entry: ProjectDb = {
     id: slug,
@@ -294,12 +299,12 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
     status: "running",
     createdAt: new Date().toISOString(),
     dataPath,
+    password,
     jobId
   };
   dbs.push(entry);
   saveRegistry(dbs);
 
-  const password = crypto.randomBytes(16).toString("base64url");
   await insertContainer({
     slug,
     name: entry.name,
@@ -324,8 +329,8 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
     await updateContainerId(slug, containerId);
     await updateContainerStatus(slug, "running");
 
-    await waitForPostgres(port);
-    await pushResultsSchema(port);
+    await waitForPostgres(port, password);
+    await pushResultsSchema(port, password);
   } catch (err) {
     await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
     throw err;
@@ -351,6 +356,8 @@ export async function createDatabase(name: string): Promise<ProjectDb> {
 
   ensureDir(dataPath);
 
+  const password = crypto.randomBytes(16).toString("base64url");
+
   const entry: ProjectDb = {
     id: slug,
     name,
@@ -358,12 +365,12 @@ export async function createDatabase(name: string): Promise<ProjectDb> {
     containerId: "",
     status: "running",
     createdAt: new Date().toISOString(),
-    dataPath
+    dataPath,
+    password
   };
   dbs.push(entry);
   saveRegistry(dbs);
 
-  const password = crypto.randomBytes(16).toString("base64url");
   await insertContainer({
     slug,
     name,
@@ -517,8 +524,8 @@ export async function destroyJobDatabase(containerId: string): Promise<void> {
  * Creates a `dataset_data` table with TEXT columns based on the schema keys.
  * Column names are sanitized to prevent SQL injection.
  */
-export async function pushDatasetSchema(port: number, schemaColumns: string[]): Promise<void> {
-  const sql = postgres(connectionUrl(port), { max: 1 });
+export async function pushDatasetSchema(port: number, password: string, schemaColumns: string[]): Promise<void> {
+  const sql = postgres(connectionUrl(port, password), { max: 1 });
   try {
     // Sanitize column names: allow only alphanumeric + underscore, max 63 chars
     const sanitized = schemaColumns
@@ -545,12 +552,13 @@ export async function pushDatasetSchema(port: number, schemaColumns: string[]): 
  */
 export async function pushDatasetRows(
   port: number,
+  password: string,
   rows: Record<string, unknown>[],
   schemaColumns: string[]
 ): Promise<void> {
   if (rows.length === 0) return;
 
-  const sql = postgres(connectionUrl(port), { max: 3 });
+  const sql = postgres(connectionUrl(port, password), { max: 3 });
   try {
     const sanitized = schemaColumns
       .map(col => col.replace(/[^a-zA-Z0-9_]/g, "_").substring(0, 63))
@@ -601,6 +609,8 @@ export async function spawnDatasetDatabase(
 
   ensureDir(dataPath);
 
+  const password = crypto.randomBytes(16).toString("base64url");
+
   const entry: ProjectDb = {
     id: slug,
     name: `Dataset #${datasetId}: ${datasetName}`,
@@ -609,12 +619,12 @@ export async function spawnDatasetDatabase(
     status: "running",
     createdAt: new Date().toISOString(),
     dataPath,
+    password,
     datasetId
   };
   dbs.push(entry);
   saveRegistry(dbs);
 
-  const password = crypto.randomBytes(16).toString("base64url");
   await insertContainer({
     slug,
     name: entry.name,
@@ -637,9 +647,9 @@ export async function spawnDatasetDatabase(
     await updateContainerId(slug, containerId);
     await updateContainerStatus(slug, "running");
 
-    await waitForPostgres(port);
-    await pushDatasetSchema(port, schemaColumns);
-    await pushDatasetRows(port, rows, schemaColumns);
+    await waitForPostgres(port, password);
+    await pushDatasetSchema(port, password, schemaColumns);
+    await pushDatasetRows(port, password, rows, schemaColumns);
   } catch (err) {
     await updateContainerStatus(slug, "error").catch(() => { /* swallow secondary errors */ });
     throw err;

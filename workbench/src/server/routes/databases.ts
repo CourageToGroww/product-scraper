@@ -132,7 +132,7 @@ app.get("/:id/studio", async (c) => {
   const entry = dbs.find(d => d.id === id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
-  const url = connectionUrl(entry.port);
+  const url = connectionUrl(entry.port, entry.password);
   return c.json({
     connectionUrl: url,
     studioCommand: `DATABASE_URL="${url}" npx drizzle-kit studio`
@@ -150,7 +150,7 @@ app.post("/:id/connect", async (c) => {
     return c.json({ error: "Database is not running. Start it first." }, 400);
   }
 
-  process.env.DATABASE_URL = connectionUrl(entry.port);
+  process.env.DATABASE_URL = connectionUrl(entry.port, entry.password);
 
   return c.json({
     connected: true,

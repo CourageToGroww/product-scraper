@@ -191,9 +191,11 @@ app.get("/:id", async (c) => {
   let databaseInfo: { port: number; connectionUrl: string; status: string } | null = null;
   if (dataset.databasePort && dataset.databaseContainerId) {
     const status = await getContainerStatus(dataset.databaseContainerId);
+    const registryEntry = loadRegistry().find(e => e.containerId === dataset.databaseContainerId);
+    const entryPassword = registryEntry?.password;
     databaseInfo = {
       port: dataset.databasePort,
-      connectionUrl: connectionUrl(dataset.databasePort),
+      connectionUrl: connectionUrl(dataset.databasePort, entryPassword),
       status
     };
   }
@@ -442,10 +444,11 @@ app.post("/:id/database/spawn", async (c) => {
       })
       .where(eq(datasets.id, id));
 
+    const spawnEntry = loadRegistry().find(e => e.id === spawn.slug);
     return c.json({
       spawned: true,
       port: spawn.port,
-      connectionUrl: connectionUrl(spawn.port)
+      connectionUrl: connectionUrl(spawn.port, spawnEntry?.password)
     }, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
