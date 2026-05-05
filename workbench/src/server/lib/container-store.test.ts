@@ -3,6 +3,10 @@ import { db } from "./db.js";
 import { containers } from "../../db/schema.js";
 import { insertContainer, listContainers, getContainerBySlug, updateContainerStatus } from "./container-store.js";
 
+if (process.env.NODE_ENV !== "test") {
+  throw new Error("container-store.test.ts: refusing to run with NODE_ENV != 'test' to protect non-test databases");
+}
+
 describe("container-store", () => {
   beforeEach(async () => {
     await db.delete(containers);

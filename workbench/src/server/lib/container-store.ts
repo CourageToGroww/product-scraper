@@ -2,8 +2,8 @@ import { db } from "./db.js";
 import { containers } from "../../db/schema.js";
 import { eq, ne } from "drizzle-orm";
 
-type ContainerType = "job-db" | "job-api" | "dataset-db" | "standalone" | "merge-target" | "main-db";
-type ContainerStatus = "creating" | "running" | "stopped" | "error" | "destroyed";
+export type ContainerType = "job-db" | "job-api" | "dataset-db" | "standalone" | "merge-target" | "main-db";
+export type ContainerStatus = "creating" | "running" | "stopped" | "error" | "destroyed";
 
 export interface InsertContainerInput {
   slug: string;
