@@ -271,6 +271,7 @@ export interface SpawnResult {
   containerId: string;
   port: number;
   slug: string;
+  password: string;
 }
 
 export async function spawnJobDatabase(jobId: number, jobName: string): Promise<SpawnResult> {
@@ -336,7 +337,7 @@ export async function spawnJobDatabase(jobId: number, jobName: string): Promise<
     throw err;
   }
 
-  return { containerId: entry.containerId, port, slug };
+  return { containerId: entry.containerId, port, slug, password };
 }
 
 // --- Manual database creation (for databases route) ---
@@ -427,10 +428,11 @@ export async function exportJobDatabase(containerId: string, slug: string): Prom
   const dockerfilePath = path.join(exportDir, "Dockerfile");
   const composePath = path.join(exportDir, "docker-compose.yml");
 
-  // Find the service name from registry
+  // Find the service name and password from registry
   const dbs = loadRegistry();
   const entry = dbs.find(d => d.containerId === containerId);
   const serviceName = entry?.id || slug;
+  const exportPassword = entry?.password ?? DB_PASSWORD;
 
   // pg_dump as plain SQL (usable as docker-entrypoint-initdb.d script)
   execSync(
@@ -441,14 +443,15 @@ export async function exportJobDatabase(containerId: string, slug: string): Prom
   // Generate standalone Dockerfile
   fs.writeFileSync(dockerfilePath, `FROM ${DB_IMAGE}
 ENV POSTGRES_USER=${DB_USER}
-ENV POSTGRES_PASSWORD=${DB_PASSWORD}
+ENV POSTGRES_PASSWORD=${exportPassword}
 ENV POSTGRES_DB=${DB_NAME}
 COPY init.sql /docker-entrypoint-initdb.d/
 EXPOSE 5432
 `);
 
   // Generate standalone docker-compose.yml
-  fs.writeFileSync(composePath, `# Exported from ScrapeKit Workbench — ${entry?.name || slug}
+  fs.writeFileSync(composePath, `# Exported from ScrapeKit Workbench - ${entry?.name || slug}
+# Connection: postgres://${DB_USER}:${exportPassword}@localhost:5432/${DB_NAME}
 # Usage: docker compose up -d
 
 services:
@@ -655,7 +658,7 @@ export async function spawnDatasetDatabase(
     throw err;
   }
 
-  return { containerId: entry.containerId, port, slug };
+  return { containerId: entry.containerId, port, slug, password };
 }
 
 /**

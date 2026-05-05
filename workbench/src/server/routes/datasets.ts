@@ -444,11 +444,10 @@ app.post("/:id/database/spawn", async (c) => {
       })
       .where(eq(datasets.id, id));
 
-    const spawnEntry = loadRegistry().find(e => e.id === spawn.slug);
     return c.json({
       spawned: true,
       port: spawn.port,
-      connectionUrl: connectionUrl(spawn.port, spawnEntry?.password)
+      connectionUrl: connectionUrl(spawn.port, spawn.password)
     }, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
