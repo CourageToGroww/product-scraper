@@ -30,6 +30,11 @@ PG_DB="${PG_DB:-scrapekit}"
 DATABASE_URL="${DATABASE_URL:-postgres://scrapekit:scrapekit@${PG_HOST}:${PG_PORT}/${PG_DB}}"
 export DATABASE_URL
 
+# Threaded into root docker-compose.yml so its postgres service binds the same
+# host port as PG_PORT (avoids 5432 conflicts when an unrelated Postgres is
+# already on the host).
+export MAIN_DB_HOST_PORT="$PG_PORT"
+
 # 1. Sanity check Docker
 if ! docker info >/dev/null 2>&1; then
   echo "Error: Docker daemon is not running. Start Docker and retry." >&2

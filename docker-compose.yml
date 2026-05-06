@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: scrapekit
       POSTGRES_DB: scrapekit
     ports:
-      - "5432:5432"
+      - "${MAIN_DB_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
