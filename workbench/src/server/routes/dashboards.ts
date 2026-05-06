@@ -84,7 +84,7 @@ app.get("/:id", async (c) => {
 
 // Update dashboard
 app.put("/:id", validateBody(updateDashboardSchema), async (c) => {
-  const id = parseInt(c.req.param("id"));
+  const id = parseInt(c.req.param("id")!);
   if (isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
 
   const body = c.get("validatedBody") as z.infer<typeof updateDashboardSchema>;
@@ -113,7 +113,7 @@ app.delete("/:id", async (c) => {
 
 // Add chart to dashboard
 app.post("/:id/charts", validateBody(createChartSchema), async (c) => {
-  const dashboardId = parseInt(c.req.param("id"));
+  const dashboardId = parseInt(c.req.param("id")!);
   if (isNaN(dashboardId)) return c.json({ error: "Invalid ID" }, 400);
 
   // Verify dashboard exists
@@ -138,7 +138,7 @@ app.post("/:id/charts", validateBody(createChartSchema), async (c) => {
 
 // Update chart
 app.put("/charts/:chartId", validateBody(updateChartSchema), async (c) => {
-  const chartId = parseInt(c.req.param("chartId"));
+  const chartId = parseInt(c.req.param("chartId")!);
   if (isNaN(chartId)) return c.json({ error: "Invalid ID" }, 400);
 
   const body = c.get("validatedBody") as z.infer<typeof updateChartSchema>;

@@ -365,7 +365,7 @@ app.get("/:id/snippet", async (c) => {
 
 // Update dataset metadata
 app.put("/:id", validateBody(updateDatasetSchema), async (c) => {
-  const id = parseInt(c.req.param("id"));
+  const id = parseInt(c.req.param("id")!);
   if (isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
 
   const body = c.get("validatedBody") as z.infer<typeof updateDatasetSchema>;
