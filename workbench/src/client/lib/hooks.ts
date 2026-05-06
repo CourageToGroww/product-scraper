@@ -303,3 +303,39 @@ export function useStudioLaunch() {
     mutationFn: (jobId: number) => api.pipelines.studioLaunch(jobId)
   });
 }
+
+export function useBuildExportBundle() {
+  return useMutation({ mutationFn: (jobId: number) => api.exports_.build(jobId) });
+}
+
+export function useMerges() {
+  return useQuery({ queryKey: ["merges"], queryFn: () => api.merges.list() });
+}
+
+export function useMerge(id: number) {
+  return useQuery({ queryKey: ["merge", id], queryFn: () => api.merges.get(id), enabled: id > 0 });
+}
+
+export function useCreateMerge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; description?: string; sourceDatasetIds: number[] }) => api.merges.create(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["merges"] })
+  });
+}
+
+export function useRerunMerge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.merges.rerun(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["merges"] })
+  });
+}
+
+export function useDeleteMerge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.merges.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["merges"] })
+  });
+}
