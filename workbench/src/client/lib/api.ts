@@ -192,3 +192,17 @@ export const databases = {
   studio: (id: string) => request<any>(`/databases/${id}/studio`),
   connect: (id: string) => request<any>(`/databases/${id}/connect`, { method: "POST" })
 };
+
+export const exports_ = {
+  build: (jobId: number) => request<{ dir: string; jobId: number; size: number }>(`/ai/jobs/${jobId}/export-bundle`, { method: "POST", body: JSON.stringify({}) }),
+  downloadUrl: (jobId: number) => `/api/ai/jobs/${jobId}/export-bundle/download`
+};
+
+export const merges = {
+  list: () => request<any[]>("/merges"),
+  get: (id: number) => request<any>(`/merges/${id}`),
+  create: (data: { name: string; description?: string; sourceDatasetIds: number[] }) =>
+    request<any>("/merges", { method: "POST", body: JSON.stringify(data) }),
+  rerun: (id: number) => request<{ ok: boolean }>(`/merges/${id}/rerun`, { method: "POST", body: JSON.stringify({}) }),
+  delete: (id: number) => request<{ ok: boolean }>(`/merges/${id}`, { method: "DELETE" })
+};

@@ -10,6 +10,8 @@ import extractRoutes from "./routes/extract.js";
 import imageRoutes from "./routes/images.js";
 import settingsRoutes from "./routes/settings.js";
 import aiPipelineRoutes from "./routes/ai-pipelines.js";
+import exportRoutes from "./routes/exports.js";
+import mergeRoutes from "./routes/merges.js";
 import { execSync } from "node:child_process";
 import { errorHandler } from "./middleware/error-handler.js";
 import { env } from "./lib/env.js";
@@ -33,6 +35,8 @@ app.route("/api/extract", extractRoutes);
 app.route("/api/images", imageRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/ai", aiPipelineRoutes);
+app.route("/api/ai", exportRoutes);
+app.route("/api/merges", mergeRoutes);
 
 // Health check
 app.get("/api/health", (c) => {

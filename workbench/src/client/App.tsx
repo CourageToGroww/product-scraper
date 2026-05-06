@@ -13,6 +13,8 @@ import DatabasesPage from "./pages/DatabasesPage";
 import DatasetBuilderPage from "./pages/DatasetBuilderPage";
 import SettingsPage from "./pages/SettingsPage";
 import JobApiPage from "./pages/JobApiPage";
+import MergeListPage from "./pages/MergeListPage";
+import MergeBuilderPage from "./pages/MergeBuilderPage";
 
 export default function App() {
   return (
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="/dashboards/:id" element={<DashboardEditPage />} />
           <Route path="/databases" element={<DatabasesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/merges" element={<MergeListPage />} />
+          <Route path="/merges/new" element={<MergeBuilderPage />} />
         </Routes>
       </Layout>
     </ToastProvider>
