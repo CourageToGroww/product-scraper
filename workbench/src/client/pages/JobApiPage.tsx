@@ -7,6 +7,7 @@ import SchemaViewer from "../components/SchemaViewer";
 import RouteEditor from "../components/RouteEditor";
 import AiChatPanel from "../components/AiChatPanel";
 import StudioLaunchButton from "../components/StudioLaunchButton";
+import ExportBundleButton from "../components/ExportBundleButton";
 
 export default function JobApiPage() {
   const { id } = useParams();
@@ -45,6 +46,7 @@ export default function JobApiPage() {
           {rebuild.isPending ? "Rebuilding..." : "Rebuild API service"}
         </button>
         <StudioLaunchButton jobId={jobId} />
+        <ExportBundleButton jobId={jobId} />
       </div>
 
       <PipelineStatusPanel jobId={jobId} />
