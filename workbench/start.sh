@@ -46,10 +46,26 @@ else
   echo "Network $NETWORK already exists."
 fi
 
-# 3. Bring up main Postgres (only that service from root compose)
+# 3. Bring up main Postgres (only that service from root compose).
+# If a container named scrapekit-main-db already exists (running or stopped),
+# reuse it instead of letting compose conflict on the name. This handles the
+# common case where the container was created out-of-band (e.g. a prior
+# session, a manually-started dev DB) and the host port differs from compose.
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-echo "Starting main Postgres ($MAIN_DB_CONTAINER)..."
-( cd "$ROOT_DIR" && docker compose up -d postgres )
+EXISTING_ID="$(docker ps -aq -f name="^${MAIN_DB_CONTAINER}$")"
+if [ -n "$EXISTING_ID" ]; then
+  EXISTING_STATE="$(docker inspect -f '{{.State.Status}}' "$EXISTING_ID" 2>/dev/null || echo "unknown")"
+  echo "Found existing $MAIN_DB_CONTAINER (state: $EXISTING_STATE); reusing it."
+  if [ "$EXISTING_STATE" != "running" ]; then
+    echo "Starting existing $MAIN_DB_CONTAINER..."
+    docker start "$MAIN_DB_CONTAINER" >/dev/null
+  fi
+  # Ensure it's attached to scrapekit-net (idempotent, will warn if already on it).
+  docker network connect "$NETWORK" "$MAIN_DB_CONTAINER" 2>/dev/null || true
+else
+  echo "Starting main Postgres ($MAIN_DB_CONTAINER) via compose..."
+  ( cd "$ROOT_DIR" && docker compose up -d postgres )
+fi
 
 # 4. Wait for Postgres to be healthy
 echo "Waiting for main Postgres to be ready..."
