@@ -154,3 +154,19 @@ export const honoServices = pgTable("hono_services", {
 }, (table) => [
   index("hono_services_job_idx").on(table.jobId)
 ]);
+
+export const merges = pgTable("merges", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sourceDatasetIds: jsonb("source_dataset_ids").notNull().$type<number[]>(),
+  targetContainerId: integer("target_container_id").references(() => containers.id, { onDelete: "set null" }),
+  status: text("status", { enum: ["pending", "running", "completed", "failed"] }).notNull().default("pending"),
+  rowCounts: jsonb("row_counts").$type<Record<string, number>>(),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+}, (table) => [
+  index("merges_status_idx").on(table.status)
+]);
