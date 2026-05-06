@@ -5,6 +5,7 @@ import { settings } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import { validateBody, type Env } from "../middleware/validate.js";
 import { aiParseJobResults, getAiSettings, PARSE_MODES, type ParseMode } from "../lib/ai-parser.js";
+import { encryptSecret, decryptSecret } from "../lib/crypto/secret-cipher.js";
 
 const app = new Hono<Env>();
 
@@ -40,11 +41,11 @@ app.get("/", async (c) => {
     aiAutoparse: row.aiAutoparse,
     aiParseMode: row.aiParseMode,
     parseModes: Object.entries(PARSE_MODES).map(([k, v]) => ({ value: k, label: v.label, description: v.description })),
-    claudeApiKey: maskKey(row.claudeApiKey),
-    openaiApiKey: maskKey(row.openaiApiKey),
-    geminiApiKey: maskKey(row.geminiApiKey),
-    deepseekApiKey: maskKey(row.deepseekApiKey),
-    kimiApiKey: maskKey(row.kimiApiKey)
+    claudeApiKey: maskKey(decryptSecret(row.claudeApiKey)),
+    openaiApiKey: maskKey(decryptSecret(row.openaiApiKey)),
+    geminiApiKey: maskKey(decryptSecret(row.geminiApiKey)),
+    deepseekApiKey: maskKey(decryptSecret(row.deepseekApiKey)),
+    kimiApiKey: maskKey(decryptSecret(row.kimiApiKey))
   });
 });
 
@@ -69,11 +70,11 @@ app.put("/", validateBody(updateSchema), async (c) => {
   if (body.aiProvider !== undefined) updateData.aiProvider = body.aiProvider;
   if (body.aiAutoparse !== undefined) updateData.aiAutoparse = body.aiAutoparse;
   if (body.aiParseMode !== undefined) updateData.aiParseMode = body.aiParseMode;
-  if (body.claudeApiKey !== undefined) updateData.claudeApiKey = body.claudeApiKey;
-  if (body.openaiApiKey !== undefined) updateData.openaiApiKey = body.openaiApiKey;
-  if (body.geminiApiKey !== undefined) updateData.geminiApiKey = body.geminiApiKey;
-  if (body.deepseekApiKey !== undefined) updateData.deepseekApiKey = body.deepseekApiKey;
-  if (body.kimiApiKey !== undefined) updateData.kimiApiKey = body.kimiApiKey;
+  if (body.claudeApiKey !== undefined) updateData.claudeApiKey = encryptSecret(body.claudeApiKey);
+  if (body.openaiApiKey !== undefined) updateData.openaiApiKey = encryptSecret(body.openaiApiKey);
+  if (body.geminiApiKey !== undefined) updateData.geminiApiKey = encryptSecret(body.geminiApiKey);
+  if (body.deepseekApiKey !== undefined) updateData.deepseekApiKey = encryptSecret(body.deepseekApiKey);
+  if (body.kimiApiKey !== undefined) updateData.kimiApiKey = encryptSecret(body.kimiApiKey);
 
   // Upsert: try update first, insert if no row exists
   const [existing] = await db.select({ id: settings.id }).from(settings).limit(1);

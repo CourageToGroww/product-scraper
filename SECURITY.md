@@ -21,6 +21,22 @@ The ScrapeKit AI Pipeline has the LLM generate Hono route handlers (TypeScript s
 
 If you need stronger isolation, additional sandboxing (e.g. gVisor, kata-containers, or static analysis of the generated TypeScript before compile) is out of scope for ScrapeKit core.
 
+## API Key Encryption at Rest
+
+Third-party API keys stored in the `settings` table (`claudeApiKey`, `openaiApiKey`, `geminiApiKey`, `deepseekApiKey`, `kimiApiKey`) are encrypted with AES-256-GCM before being written to the database.
+
+**Environment variable:** `SCRAPEKIT_KEY_ENCRYPTION_KEY`
+
+Set this to a base64-encoded 32-byte key:
+
+```
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+If `SCRAPEKIT_KEY_ENCRYPTION_KEY` is not set, a deterministic dev fallback key is used. This keeps existing dev databases working without manual setup, but **must not be used in production** — any attacker with DB access could decrypt keys using the publicly known fallback derivation.
+
+**Compatibility:** existing plaintext keys in the DB continue to work after enabling encryption (they are returned as-is on read and re-encrypted on next write).
+
 ## Reporting
 
 Email security issues to the project owner; do not file public issues.

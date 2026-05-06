@@ -1,12 +1,12 @@
-import { execSync } from "node:child_process";
+import * as tar from "tar";
 import path from "node:path";
 import fs from "node:fs";
 
-export function packDir(dir: string): { tarPath: string; size: number } {
+export async function packDir(dir: string): Promise<{ tarPath: string; size: number }> {
   const parent = path.dirname(dir);
   const base = path.basename(dir);
   const tarPath = `${dir}.tar.gz`;
-  execSync(`tar -C "${parent}" -czf "${tarPath}" "${base}"`);
+  await tar.create({ gzip: true, file: tarPath, cwd: parent }, [base]);
   const size = fs.statSync(tarPath).size;
   return { tarPath, size };
 }

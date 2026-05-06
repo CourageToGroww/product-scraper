@@ -84,3 +84,17 @@ export function killStudioForJob(jobId: number): boolean {
   activeStudios.delete(jobId);
   return true;
 }
+
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [jobId, entry] of activeStudios.entries()) {
+    if (now - entry.startedAt > IDLE_TIMEOUT_MS) {
+      try { entry.proc.kill("SIGTERM"); } catch { /* ignore */ }
+      usedPorts.delete(entry.port);
+      activeStudios.delete(jobId);
+      console.log(`[studio-launcher] killed idle studio for job ${jobId}`);
+    }
+  }
+}, 60_000).unref();

@@ -22,7 +22,7 @@ app.get("/jobs/:id/export-bundle/download", async (c) => {
   if (!Number.isInteger(jobId) || jobId <= 0) return c.json({ error: "Invalid job id" }, 400);
   try {
     const bundle = await buildJobBundle(jobId);
-    const { tarPath } = packDir(bundle.dir);
+    const { tarPath } = await packDir(bundle.dir);
     const buf = fs.readFileSync(tarPath);
     return new Response(buf, {
       headers: {
