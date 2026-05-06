@@ -47,7 +47,12 @@ export default function ScrapeNewPage() {
   // Discovery
   const [discovering, setDiscovering] = useState(false);
   const [discoveryResult, setDiscoveryResult] = useState<{ urls: string[]; method: string; count: number } | null>(null);
-  const [discoverJsRender, setDiscoverJsRender] = useState(false);
+  const [discoverJsRender, setDiscoverJsRender] = useState(true);
+
+  // Auto-crawl: when ON (default), submitting with a single URL first runs discovery
+  // and uses every discovered page. Best fit for documentation / blog / multi-page sites.
+  const [autoCrawl, setAutoCrawl] = useState(true);
+  const [autoCrawlMaxUrls, setAutoCrawlMaxUrls] = useState("100");
 
   // API pagination detection
   const [detecting, setDetecting] = useState(false);
@@ -61,7 +66,7 @@ export default function ScrapeNewPage() {
   const [extract, setExtract] = useState("");
 
   // Browser
-  const [jsRender, setJsRender] = useState(false);
+  const [jsRender, setJsRender] = useState(true);
   const [stealth, setStealth] = useState(false);
   const [device, setDevice] = useState("");
   const [windowWidth, setWindowWidth] = useState("");
@@ -143,10 +148,38 @@ export default function ScrapeNewPage() {
     e.preventDefault();
     setError("");
 
-    const urlList = urls.split("\n").map(u => u.trim()).filter(Boolean);
+    let urlList = urls.split("\n").map(u => u.trim()).filter(Boolean);
     if (!name || urlList.length === 0) {
       setError("Name and at least one URL are required");
       return;
+    }
+
+    // Auto-crawl: when ON and the user gave exactly ONE URL, run discovery first
+    // and use every discovered page. This is what users typically want for
+    // documentation/blog sites (e.g. https://react.dev -> all docs pages).
+    if (autoCrawl && urlList.length === 1 && !discoveryResult) {
+      const seed = urlList[0];
+      const cleanSeed = seed.replace(/\[\d+-\d+\]/g, "1");
+      try { new URL(cleanSeed); } catch { setError("Invalid seed URL"); return; }
+
+      setDiscovering(true);
+      try {
+        const max = Math.max(1, Math.min(parseInt(autoCrawlMaxUrls, 10) || 100, 500));
+        const result = await api.scrapes.discover({ url: cleanSeed, jsRender: discoverJsRender, maxUrls: max });
+        setDiscoveryResult(result);
+        if (result.count > 0) {
+          urlList = result.urls;
+          setUrls(result.urls.join("\n"));
+          toast(`Auto-crawl found ${result.count} pages, scraping all of them`, "success");
+        } else {
+          toast("Auto-crawl found no extra pages; scraping just the seed URL", "warning");
+        }
+      } catch (err: any) {
+        setDiscovering(false);
+        setError(`Auto-crawl failed: ${err.message}. Disable Auto-crawl to scrape only the entered URL.`);
+        return;
+      }
+      setDiscovering(false);
     }
 
     // Validate URLs (allow [N-M] patterns by stripping them for URL check)
@@ -274,6 +307,38 @@ export default function ScrapeNewPage() {
           <div className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
             Use <code className="text-xs px-1 py-0.5" style={{ background: "var(--color-surface-glass)" }}>[1-50]</code> patterns for paginated endpoints. Type is auto-detected (API or web page).
           </div>
+        </div>
+
+        {/* Auto-crawl: default ON. When user enters one seed URL, automatically discover
+            and scrape every linked page. Best fit for docs/blogs/multi-page sites. */}
+        <div className="glass-card p-3" style={{ borderLeft: "3px solid var(--color-primary)" }}>
+          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: "var(--color-text)" }}>
+            <input
+              type="checkbox"
+              checked={autoCrawl}
+              onChange={e => setAutoCrawl(e.target.checked)}
+              style={{ accentColor: "var(--color-primary)" }}
+            />
+            <span style={{ fontWeight: 600 }}>Auto-crawl entire site (recommended)</span>
+            <Tooltip text="When you enter a single seed URL, automatically discover and scrape every linked page on the same site. Disable to scrape only the URLs you entered." />
+          </label>
+          {autoCrawl && (
+            <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: "auto 1fr" }}>
+              <Label tip="Hard cap on the number of pages discovered + scraped">Max pages</Label>
+              <input
+                className="input-field"
+                type="number"
+                min="1"
+                max="500"
+                value={autoCrawlMaxUrls}
+                onChange={e => setAutoCrawlMaxUrls(e.target.value)}
+                style={{ width: "8rem" }}
+              />
+              <div className="text-xs" style={{ color: "var(--color-text-muted)", gridColumn: "1 / -1" }}>
+                Discovery runs on submit. Defaults to JS Rendering ON for SPAs (React, Vue, Next.js, etc.). To pick specific URLs by hand, click "Discover Pages" above first or paste them into the URL box and turn this off.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Helper buttons: Discover + Auto-Detect Pagination */}
