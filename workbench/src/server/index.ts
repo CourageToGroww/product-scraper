@@ -3,6 +3,16 @@ import app from "./app.js";
 import { env } from "./lib/env.js";
 import { migrateRegistryIfNeeded } from "./lib/registry-migrate.js";
 
+// Keep the server alive when async background work (e.g. dockerode HTTP calls,
+// stale registry inspect-fallbacks) emits unhandled errors after a request returns.
+// Log loudly so we still notice problems, but do not exit.
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException] keeping server alive:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection] keeping server alive:", reason);
+});
+
 async function main() {
   const result = await migrateRegistryIfNeeded();
   if (!result.skipped) {
