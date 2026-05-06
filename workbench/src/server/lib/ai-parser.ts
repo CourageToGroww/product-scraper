@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { decryptSecret } from "./crypto/secret-cipher.js";
 import { scrapeResults, datasets, datasetRows, settings as settingsTable } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import { spawnDatasetDatabase } from "./docker-manager.js";
@@ -605,7 +606,7 @@ export async function getAiSettings(): Promise<{
     kimi: row.kimiApiKey
   };
 
-  const apiKey = keyMap[provider];
+  const apiKey = decryptSecret(keyMap[provider]);
   if (!apiKey) return null;
 
   return {
