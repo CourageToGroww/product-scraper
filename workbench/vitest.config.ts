@@ -7,7 +7,8 @@ export default defineConfig({
     globals: false,
     testTimeout: 10000,
     env: {
-      NODE_ENV: "test"
+      NODE_ENV: "test",
+      DATABASE_URL: "postgres://scrapekit:scrapekit@localhost:5434/scrapekit"
     }
   }
 });
